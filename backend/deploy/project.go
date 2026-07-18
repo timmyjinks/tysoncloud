@@ -1,6 +1,9 @@
 package deploy
 
-import "context"
+import (
+	"context"
+	"log/slog"
+)
 
 func (d *DeployService) CreateProject(ctx context.Context, namespace string) error {
 	err := d.svc.CreateNamespace(ctx, namespace)
@@ -9,6 +12,9 @@ func (d *DeployService) CreateProject(ctx context.Context, namespace string) err
 	}
 
 	if err := d.svc.CreateNetworkPolicy(ctx, namespace, d.svc.ClusterIP); err != nil {
+		if cleanupErr := d.svc.DeleteNamespace(ctx, namespace); cleanupErr != nil {
+			slog.Error(cleanupErr.Error())
+		}
 		return err
 	}
 	return nil

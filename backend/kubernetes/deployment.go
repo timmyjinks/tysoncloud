@@ -1,0 +1,121 @@
+package kubernetes
+
+import (
+	"context"
+
+	"github.com/timmyjinks/tysoncloud/util"
+	corev1 "k8s.io/api/core/v1"
+	resourcev1 "k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1apply "k8s.io/client-go/applyconfigurations/apps/v1"
+	appcorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	appmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
+)
+
+func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resource) error {
+	container := []appcorev1.ContainerApplyConfiguration{
+		{
+			Name:  &resource.Name,
+			Image: &resource.Image,
+			Resources: &appcorev1.ResourceRequirementsApplyConfiguration{
+				Limits: &corev1.ResourceList{
+					corev1.ResourceCPU:    resourcev1.MustParse("500m"),
+					corev1.ResourceMemory: resourcev1.MustParse("256Mi"),
+				},
+				Requests: &corev1.ResourceList{
+					corev1.ResourceCPU:    resourcev1.MustParse("100m"),
+					corev1.ResourceMemory: resourcev1.MustParse("1Mi"),
+				},
+			},
+			Ports: []appcorev1.ContainerPortApplyConfiguration{
+				{
+					Protocol:      (*corev1.Protocol)(util.StringPtr(string(corev1.ProtocolTCP))),
+					ContainerPort: &resource.Port,
+				},
+			},
+		},
+	}
+
+	if len(resource.Env) != 0 {
+		container[0].EnvFrom = []appcorev1.EnvFromSourceApplyConfiguration{
+			{
+				SecretRef: &appcorev1.SecretEnvSourceApplyConfiguration{
+					LocalObjectReferenceApplyConfiguration: appcorev1.LocalObjectReferenceApplyConfiguration{
+						Name: &resource.Name,
+					},
+				},
+			},
+		}
+	}
+
+	spec := &appsv1apply.DeploymentSpecApplyConfiguration{
+		Selector: &appmetav1.LabelSelectorApplyConfiguration{
+			MatchLabels: map[string]string{
+				"app": resource.Name,
+			},
+		},
+		Template: &appcorev1.PodTemplateSpecApplyConfiguration{
+			ObjectMetaApplyConfiguration: &appmetav1.ObjectMetaApplyConfiguration{
+				Name: &resource.Name,
+				Labels: map[string]string{
+					"app": resource.Name,
+				},
+			},
+			Spec: &appcorev1.PodSpecApplyConfiguration{
+				Containers: container,
+			},
+		},
+	}
+
+	if resource.MountPath != "" {
+		spec.Template.Spec.Containers[0].VolumeMounts = []appcorev1.VolumeMountApplyConfiguration{
+			{
+				Name:      &resource.Name,
+				MountPath: &resource.MountPath,
+			},
+		}
+		container[0].VolumeMounts = []appcorev1.VolumeMountApplyConfiguration{
+			{
+				Name:      &resource.Name,
+				MountPath: &resource.MountPath,
+			},
+		}
+		spec.Template.Spec.Volumes = []appcorev1.VolumeApplyConfiguration{
+			{
+				Name: &resource.Name,
+				VolumeSourceApplyConfiguration: appcorev1.VolumeSourceApplyConfiguration{
+					PersistentVolumeClaim: &appcorev1.PersistentVolumeClaimVolumeSourceApplyConfiguration{
+						ClaimName: &resource.Name,
+					},
+				},
+			},
+		}
+	}
+
+	_, err := d.clientset.AppsV1().Deployments(resource.Namespace).Apply(ctx, &appsv1apply.DeploymentApplyConfiguration{
+		TypeMetaApplyConfiguration: appmetav1.TypeMetaApplyConfiguration{
+			Kind:       util.StringPtr("Deployment"),
+			APIVersion: util.StringPtr("apps/v1"),
+		},
+		ObjectMetaApplyConfiguration: &appmetav1.ObjectMetaApplyConfiguration{
+			Name: &resource.Name,
+			Labels: map[string]string{
+				"app": resource.Name,
+			},
+			Annotations: map[string]string{
+				"reloader.stakater.com/auto": "true",
+			},
+		},
+		Spec: spec,
+	}, metav1.ApplyOptions{
+		FieldManager: "tysoncloud",
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (d *KubernetesService) DeleteDeployment(ctx context.Context, resource Resource) error {
+	return d.clientset.AppsV1().Deployments(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
+}

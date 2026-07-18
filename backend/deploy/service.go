@@ -2,12 +2,10 @@ package deploy
 
 import (
 	"context"
-
-	"github.com/timmyjinks/tysoncloud/kubernetes"
 )
 
 func (d *DeployService) CreateService(ctx context.Context, service Service) error {
-	if err := d.svc.CreateService(ctx, kubernetes.Resource{}); err != nil {
+	if err := d.svc.CreateService(ctx, ServiceToResource(service)); err != nil {
 		return err
 	}
 
@@ -39,8 +37,16 @@ func (d *DeployService) CreateService(ctx context.Context, service Service) erro
 }
 
 func (d *DeployService) DeleteService(ctx context.Context, service Service) error {
-	if err := d.svc.DeletePVC(ctx, ServiceToResource(service)); err != nil {
-		return err
+	if service.Volume != nil {
+		if err := d.svc.DeletePVC(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
+	}
+
+	if len(service.Env) != 0 {
+		if err := d.svc.DeleteSecret(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
 	}
 
 	if err := d.svc.DeleteHPA(ctx, ServiceToResource(service)); err != nil {

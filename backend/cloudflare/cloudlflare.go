@@ -13,13 +13,14 @@ type CloudflareService struct {
 	baseDomain string
 }
 
-func NewCloudflareService(apiToken, tunnelId, zoneId string) *CloudflareService {
+func NewCloudflareService(apiToken, tunnelId, zoneId, baseDomain string) *CloudflareService {
 	cli := cloudflare.NewClient(option.WithAPIToken(apiToken))
 
 	return &CloudflareService{
-		Cli:       cli,
-		accountID: apiToken,
-		tunnelID:  tunnelId,
-		zoneID:    zoneId,
+		Cli:        cli,
+		accountID:  apiToken,
+		tunnelID:   tunnelId,
+		zoneID:     zoneId,
+		baseDomain: baseDomain,
 	}
 }

@@ -19,10 +19,11 @@ type Config struct {
 }
 
 type CloudflareConfig struct {
-	AccountID string `env:"ACCOUNT_ID"`
-	ZoneID    string `env:"ZONE_ID"`
-	TunnelID  string `env:"TUNNEL_ID"`
-	ApiToken  string `env:"CLOUDFLARE_API_TOKEN"`
+	AccountID  string `env:"ACCOUNT_ID"`
+	ZoneID     string `env:"ZONE_ID"`
+	TunnelID   string `env:"TUNNEL_ID"`
+	ApiToken   string `env:"CLOUDFLARE_API_TOKEN"`
+	BaseDomain string `env:"BASE_DOMAIN"`
 }
 
 type Server struct {

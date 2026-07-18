@@ -67,7 +67,9 @@ func (c *CloudflareService) DeleteRoute(ctx context.Context, subdomain string) e
 
 	ingress = removeRouteByIndex(ingress, index)
 
-	c.updateIngress(ctx, ingress)
+	if err := c.updateIngress(ctx, ingress); err != nil {
+		return err
+	}
 
 	return nil
 }

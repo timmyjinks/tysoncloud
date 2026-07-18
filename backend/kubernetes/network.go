@@ -14,7 +14,7 @@ import (
 )
 
 func (d *KubernetesService) CreateNetworkPolicy(ctx context.Context, namespace, clusterIP string) error {
-	_, err := d.clientset.NetworkingV1().NetworkPolicies(namespace).Apply(context.TODO(), &v1.NetworkPolicyApplyConfiguration{
+	_, err := d.clientset.NetworkingV1().NetworkPolicies(namespace).Apply(ctx, &v1.NetworkPolicyApplyConfiguration{
 		TypeMetaApplyConfiguration: appmetav1.TypeMetaApplyConfiguration{
 			Kind:       util.StringPtr("NetworkPolicy"),
 			APIVersion: util.StringPtr("networking.k8s.io/v1"),

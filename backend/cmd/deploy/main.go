@@ -17,17 +17,20 @@ func main() {
 	}
 	cfg.UpdateFromArgs()
 
-	cloudflareService := cloudflare.NewCloudflareService(cfg.Cloudflare.ApiToken, cfg.Cloudflare.TunnelID, cfg.Cloudflare.ZoneID)
+	cloudflareService := cloudflare.NewCloudflareService(cfg.Cloudflare.ApiToken, cfg.Cloudflare.TunnelID, cfg.Cloudflare.ZoneID, cfg.Cloudflare.BaseDomain)
 	supabaseCli, err := db.NewSupabaseStorage(cfg.Supabase.ProjectURL, cfg.Supabase.APIKey)
 	if err != nil {
 		panic(err)
 	}
 	supabaseService := store.NewSupabaseStore(supabaseCli)
 
+	taskRegistry := server.NewTaskRegistry()
+
 	app := &server.Application{
-		Config:     cfg,
-		Supabase:   supabaseService,
-		Cloudflare: cloudflareService,
+		Config:       cfg,
+		Supabase:     supabaseService,
+		Cloudflare:   cloudflareService,
+		TaskRegistry: taskRegistry,
 	}
 
 	s := server.Mount(app)

@@ -38,12 +38,6 @@ func (d *KubernetesService) CreatePostgresDatabase(ctx context.Context, resource
 		},
 	}
 
-	if resource.StorageGB > 0 {
-		cluster.Spec.StorageConfiguration = cnpgv1.StorageConfiguration{
-			Size: fmt.Sprintf("%dGi", resource.StorageGB),
-		}
-	}
-
 	storageSize := resource.StorageGB
 	if storageSize <= 0 {
 		storageSize = 5

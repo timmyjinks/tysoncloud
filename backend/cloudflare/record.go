@@ -42,6 +42,10 @@ func (c *CloudflareService) DeleteRecord(ctx context.Context, subdomain string) 
 		}
 	}
 
+	if record.ID == "" {
+		return nil
+	}
+
 	c.Cli.DNS.Records.Delete(ctx, record.ID, dns.RecordDeleteParams{
 		ZoneID: cloudflare.String(c.zoneID),
 	})

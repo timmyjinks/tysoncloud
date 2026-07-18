@@ -33,7 +33,7 @@ func (app *Application) Start(mux http.Handler) error {
 		IdleTimeout: 90 * time.Second,
 	}
 
-	fmt.Printf("Server running on http://localhost:%s\n", app.Config.Server.Addr)
-	fmt.Printf("Server running on http://0.0.0.0:%s\n", app.Config.Server.Addr)
+	fmt.Printf("Server running on http://localhost%s\n", app.Config.Server.Addr)
+	fmt.Printf("Server running on http://0.0.0.0%s\n", app.Config.Server.Addr)
 	return server.ListenAndServe()
 }

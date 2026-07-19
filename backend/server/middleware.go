@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -46,14 +47,17 @@ func ClientFromContext(ctx context.Context) *supabase.Client {
 }
 
 func extractTokenFromCookie(r *http.Request) (string, error) {
-	cookie, err := r.Cookie("sb-127-auth-token.0")
-	if err != nil {
-		return "", err
+	var val string
+	for _, cookie := range r.Cookies() {
+		if strings.HasPrefix(cookie.Name, "sb-") && strings.HasSuffix(cookie.Name, "-auth-token.0") {
+			val = cookie.Value
+			break
+		}
+	}
+	if val == "" {
+		return "", errors.New("auth cookie not found")
 	}
 
-	val := cookie.Value
-
-	// Supabase SSR cookies are often base64-encoded, sometimes prefixed with "base64-"
 	val = strings.TrimPrefix(val, "base64-")
 
 	decoded, err := base64.StdEncoding.DecodeString(val)

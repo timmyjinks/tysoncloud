@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -28,36 +29,36 @@ func (s *SupabaseStore) GetVolume(serviceId string) (VolumesTable, error) {
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateVolume(serviceId, mountPath string, storageGB int32) (VolumesTable, error) {
-	bytes, _, err := s.cli.From("volumes").Insert(struct {
-		ServiceId string `json:"service_id"`
-		MountPath string `json:"mount_path"`
-		StorageGB int32  `json:"storage_gb"`
-	}{
-		ServiceId: serviceId,
-		MountPath: mountPath,
-		StorageGB: storageGB,
-	}, false, "", "", "").Execute()
-	if err != nil {
+func (s *SupabaseStore) CreateVolume(serviceId, userId, mountPath string, storageGB int32) (VolumesTable, error) {
+	result := s.cli.Rpc("create_volume", "", map[string]interface{}{
+		"p_service_id": serviceId,
+		"p_user_id":    userId,
+		"p_mount_path": mountPath,
+		"p_storage_gb": storageGB,
+	})
+
+	var res VolumesTable
+	if err := json.Unmarshal([]byte(result), &res); err != nil {
 		return VolumesTable{}, err
 	}
 
-	var res []VolumesTable = []VolumesTable{}
-	if err := json.Unmarshal(bytes, &res); err != nil {
-		return VolumesTable{}, err
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return VolumesTable{}, fmt.Errorf("create_service failed: %s", pgErr.Message)
 	}
 
-	if len(res) == 0 {
-		return VolumesTable{}, errors.New("error creating volume")
-	}
-
-	return res[0], nil
+	return res, nil
 }
 
-func (s *SupabaseStore) DeleteVolume(serviceId string) error {
-	_, _, err := s.cli.From("volumes").Delete("", "").Eq("service_id", serviceId).Execute()
-	if err != nil {
-		return err
+func (s *SupabaseStore) DeleteVolume(serviceId, userId string) error {
+	result := s.cli.Rpc("delete_volume", "", map[string]interface{}{
+		"p_service_id": serviceId,
+		"p_user_id":    userId,
+	})
+
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return fmt.Errorf("create_service failed: %s", pgErr.Message)
 	}
 
 	return nil

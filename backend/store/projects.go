@@ -8,15 +8,29 @@ import (
 )
 
 type ProjectsTable struct {
-	ID        string    `json:"id,omitempty"`
+	Id        string    `json:"id"`
 	UserId    string    `json:"user_id"`
-	Namespace string    `json:"namespace,omitempty"`
+	Namespace string    `json:"namespace"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (s *SupabaseStore) GetProjects() ([]ProjectsTable, error) {
-	res, _, err := s.cli.From("projects").Select("*", "exact", false).Order("created_at", &postgrest.OrderOpts{Ascending: false}).Execute()
+func (s *SupabaseStore) GetProject(id string, userId string) (ProjectsTable, error) {
+	res, _, err := s.cli.From("projects").Select("*", "exact", false).Order("created_at", &postgrest.OrderOpts{Ascending: false}).Eq("id", id).Eq("user_id", userId).Single().Execute()
+	if err != nil {
+		return ProjectsTable{}, err
+	}
+
+	var table ProjectsTable
+	if err := json.Unmarshal(res, &table); err != nil {
+		return ProjectsTable{}, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetProjects(userId string) ([]ProjectsTable, error) {
+	res, _, err := s.cli.From("projects").Select("*", "exact", false).Order("created_at", &postgrest.OrderOpts{Ascending: false}).Eq("user_id", userId).Execute()
 	if err != nil {
 		return nil, err
 	}
@@ -29,13 +43,11 @@ func (s *SupabaseStore) GetProjects() ([]ProjectsTable, error) {
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateProject(id, userId, name string) error {
+func (s *SupabaseStore) CreateProject(userId, name string) error {
 	_, _, err := s.cli.From("projects").Insert(struct {
-		ID     string `json:"id,omitempty"`
 		UserId string `json:"user_id"`
 		Name   string `json:"name"`
 	}{
-		ID:     id,
 		UserId: userId,
 		Name:   name,
 	}, false, "", "", "").Execute()
@@ -43,5 +55,30 @@ func (s *SupabaseStore) CreateProject(id, userId, name string) error {
 		return err
 	}
 
+	return nil
+}
+
+func (s *SupabaseStore) UpdateProject(id, userId, name string) error {
+	_, _, err := s.cli.From("projects").Update(struct {
+		Id     string `json:"id"`
+		UserId string `json:"user_id"`
+		Name   string `json:"name"`
+	}{
+		Id:     id,
+		UserId: userId,
+		Name:   name,
+	}, "", "").Eq("user_id", userId).Eq("id", id).Execute()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *SupabaseStore) DeleteProject(userId, id string) error {
+	_, _, err := s.cli.From("projects").Delete("", "").Eq("id", id).Eq("user_id", userId).Execute()
+	if err != nil {
+		return err
+	}
 	return nil
 }

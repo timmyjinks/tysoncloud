@@ -1,9 +1,17 @@
 package server
 
+import (
+	"errors"
+)
+
+type ServiceResponse struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type ServiceCreateRequest struct {
-	Name   string `json:"name"`
-	Volume string `json:"volume"`
-	Type   string `json:"type"`
+	Name  string `json:"name"`
+	Image string `json:"image"`
 }
 
 type ServiceCreateResponse struct {
@@ -11,30 +19,25 @@ type ServiceCreateResponse struct {
 }
 
 type ServiceUpdateRequest struct {
-	Id      string `json:"id"`
-	Newname string `json:"name"`
-	Env     string `json:"env"`
-	Volume  string `json:"volume"`
+	Name  *string `json:"name"`
+	Image *string `json:"image"`
 }
 
 type ServiceDeleteRequest struct {
 	Id string `json:"id"`
 }
 
+type ProjectResponse struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type ProjectCreateRequest struct {
-	Id     string `json:"id"`
-	Name   string `json:"name"`
-	Env    string `json:"env"`
-	Volume string `json:"volume"`
+	Name string `json:"name"`
 }
 
 type ProjectUpdateRequest struct {
-	Id      string `json:"id"`
-	Newname string `json:"name"`
-	Env     string `json:"env"`
-	Volume  string `json:"volume"`
+	Name *string `json:"name,omitempty"`
 }
 
-type ProjectDeleteRequest struct {
-	Id string `json:"id"`
-}
+var emptyName error = errors.New("name was empty")

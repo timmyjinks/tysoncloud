@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
 )
 
@@ -97,8 +98,21 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.CreateService(user.ID.String(), projectId, service.Name, service.Image); err != nil {
+	res, err := app.Supabase.CreateService(user.ID.String(), projectId, service.Name, service.Image, service.Port)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
+		Namespace: "proj-" + projectId,
+		Name:      res.ResourceName,
+		Hostname:  res.PublicDomain,
+		Env:       map[string][]byte{},
+		Image:     service.Image,
+		Port:      service.Port,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 
@@ -106,6 +120,12 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
+	projectId := mux.Vars(r)["project_id"]
+	if projectId == "" {
+		http.Error(w, "project with id not found", http.StatusBadRequest)
+		return
+	}
+
 	serviceId := mux.Vars(r)["service_id"]
 	if serviceId == "" {
 		http.Error(w, invalidServiceId.Error(), http.StatusBadRequest)
@@ -141,13 +161,33 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.UpdateService(serviceId, user.ID.String(), *service.Name, *service.Image); err != nil {
+	res, err := app.Supabase.UpdateService(serviceId, user.ID.String(), *service.Name, *service.Image)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
+		Namespace: "proj-" + projectId,
+		Name:      res.ResourceName,
+		Hostname:  res.PublicDomain,
+		Env:       map[string][]byte{},
+		Image:     *service.Image,
+		Port:      *service.Port,
+	}); err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
 }
 
 func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
+	projectId := mux.Vars(r)["project_id"]
+	if projectId == "" {
+		http.Error(w, "project with id not found", http.StatusBadRequest)
+		return
+	}
+
 	serviceId := mux.Vars(r)["service_id"]
 	if serviceId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
@@ -168,6 +208,13 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 
 	if err := app.Supabase.DeleteService(serviceId, user.ID.String()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
+		Namespace: "proj-" + projectId,
+		Name:      "svc-" + serviceId,
+	}); err != nil {
 		return
 	}
 

@@ -16,6 +16,7 @@ type Config struct {
 	Server     Server   `toml:"server"`
 	Supabase   Supabase `toml:"supabase"`
 	Cloudflare CloudflareConfig
+	KubeConfig string `env:"KUBE_CONFIG"`
 }
 
 type CloudflareConfig struct {
@@ -56,6 +57,12 @@ func Load() (Config, error) {
 
 	config.Server.InitDefaults()
 	config.Supabase.InitDefaults()
+
+	kubeConfig := os.Getenv("KUBECONFIG")
+	if kubeConfig == "" {
+		kubeConfig = "~/.kube/config"
+	}
+	config.KubeConfig = kubeConfig
 
 	return config, nil
 }

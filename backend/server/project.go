@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -89,7 +90,13 @@ func (app *Application) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.CreateProject(user.ID.String(), project.Name); err != nil {
+	res, err := app.Supabase.CreateProject(user.ID.String(), project.Name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := app.Deploy.CreateProject(r.Context(), res.Namespace); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -132,6 +139,7 @@ func (app *Application) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 }
 
 func (app *Application) DeleteProject(w http.ResponseWriter, r *http.Request) {
@@ -156,6 +164,10 @@ func (app *Application) DeleteProject(w http.ResponseWriter, r *http.Request) {
 	if err := app.Supabase.DeleteProject(user.ID.String(), projectId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if err := app.Deploy.DeleteProject(r.Context(), "proj-"+projectId); err != nil {
+		slog.Error(err.Error())
 	}
 
 	w.WriteHeader(204)

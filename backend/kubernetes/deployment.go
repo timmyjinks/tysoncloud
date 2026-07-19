@@ -67,31 +67,6 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 		},
 	}
 
-	if resource.MountPath != "" {
-		spec.Template.Spec.Containers[0].VolumeMounts = []appcorev1.VolumeMountApplyConfiguration{
-			{
-				Name:      &resource.Name,
-				MountPath: &resource.MountPath,
-			},
-		}
-		container[0].VolumeMounts = []appcorev1.VolumeMountApplyConfiguration{
-			{
-				Name:      &resource.Name,
-				MountPath: &resource.MountPath,
-			},
-		}
-		spec.Template.Spec.Volumes = []appcorev1.VolumeApplyConfiguration{
-			{
-				Name: &resource.Name,
-				VolumeSourceApplyConfiguration: appcorev1.VolumeSourceApplyConfiguration{
-					PersistentVolumeClaim: &appcorev1.PersistentVolumeClaimVolumeSourceApplyConfiguration{
-						ClaimName: &resource.Name,
-					},
-				},
-			},
-		}
-	}
-
 	_, err := d.clientset.AppsV1().Deployments(resource.Namespace).Apply(ctx, &appsv1apply.DeploymentApplyConfiguration{
 		TypeMetaApplyConfiguration: appmetav1.TypeMetaApplyConfiguration{
 			Kind:       util.StringPtr("Deployment"),
@@ -118,4 +93,57 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 
 func (d *KubernetesService) DeleteDeployment(ctx context.Context, resource Resource) error {
 	return d.clientset.AppsV1().Deployments(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
+}
+
+func (d *KubernetesService) attachPVCToDeployment(ctx context.Context, resource Resource) error {
+	deployment, err := d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Get(ctx, resource.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	volumeName := "vol-" + resource.Name
+
+	deployment.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: resource.Name,
+				},
+			},
+		},
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: resource.MountPath,
+		},
+	}
+
+	_, err = d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Update(ctx, deployment, metav1.UpdateOptions{})
+	return err
+}
+
+func (d *KubernetesService) detachPVCToDeployment(ctx context.Context, resource Resource) error {
+	deployment, err := d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Get(ctx, resource.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Volumes = nil
+	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+
+	d.DeletePVC(ctx, resource)
+
+	_, err = d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Update(ctx, deployment, metav1.UpdateOptions{})
+	return err
 }

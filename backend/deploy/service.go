@@ -15,12 +15,6 @@ func (d *DeployService) CreateService(ctx context.Context, service Service) erro
 		}
 	}
 
-	if service.Volume != nil {
-		if err := d.svc.CreatePVC(ctx, ServiceToResource(service)); err != nil {
-			return err
-		}
-	}
-
 	if err := d.svc.CreateDeployment(ctx, ServiceToResource(service)); err != nil {
 		return err
 	}
@@ -37,11 +31,11 @@ func (d *DeployService) CreateService(ctx context.Context, service Service) erro
 }
 
 func (d *DeployService) DeleteService(ctx context.Context, service Service) error {
-	if service.Volume != nil {
-		if err := d.svc.DeletePVC(ctx, ServiceToResource(service)); err != nil {
-			return err
-		}
-	}
+	// if service.Volume != nil {
+	// 	if err := d.svc.DeletePVC(ctx, ServiceToResource(service)); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	if len(service.Env) != 0 {
 		if err := d.svc.DeleteSecret(ctx, ServiceToResource(service)); err != nil {

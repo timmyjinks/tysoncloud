@@ -6,6 +6,8 @@ import (
 	"github.com/timmyjinks/tysoncloud/cloudflare"
 	"github.com/timmyjinks/tysoncloud/config"
 	"github.com/timmyjinks/tysoncloud/db"
+	"github.com/timmyjinks/tysoncloud/deploy"
+	"github.com/timmyjinks/tysoncloud/kubernetes"
 	"github.com/timmyjinks/tysoncloud/server"
 	"github.com/timmyjinks/tysoncloud/store"
 )
@@ -24,12 +26,23 @@ func main() {
 	}
 	supabaseService := store.NewSupabaseStore(supabaseCli)
 
+	kubernetesService, err := kubernetes.NewKubernetesService(cfg.KubeConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	deployService := deploy.NewDeployService(kubernetesService)
+	if err != nil {
+		panic(err)
+	}
+
 	taskRegistry := server.NewTaskRegistry()
 
 	app := &server.Application{
 		Config:       cfg,
 		Supabase:     supabaseService,
 		Cloudflare:   cloudflareService,
+		Deploy:       deployService,
 		TaskRegistry: taskRegistry,
 	}
 

@@ -5,10 +5,10 @@ import (
 )
 
 type DeployService struct {
-	svc kubernetes.KubernetesService
+	svc *kubernetes.KubernetesService
 }
 
-func NewDeployService(svc kubernetes.KubernetesService) *DeployService {
+func NewDeployService(svc *kubernetes.KubernetesService) *DeployService {
 	return &DeployService{
 		svc: svc,
 	}

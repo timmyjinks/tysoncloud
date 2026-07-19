@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -43,8 +44,8 @@ func (s *SupabaseStore) GetProjects(userId string) ([]ProjectsTable, error) {
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateProject(userId, name string) error {
-	_, _, err := s.cli.From("projects").Insert(struct {
+func (s *SupabaseStore) CreateProject(userId, name string) (ProjectsTable, error) {
+	bytes, _, err := s.cli.From("projects").Insert(struct {
 		UserId string `json:"user_id"`
 		Name   string `json:"name"`
 	}{
@@ -52,10 +53,16 @@ func (s *SupabaseStore) CreateProject(userId, name string) error {
 		Name:   name,
 	}, false, "", "", "").Execute()
 	if err != nil {
-		return err
+		return ProjectsTable{}, err
+	}
+	fmt.Println(string(bytes))
+
+	var res []ProjectsTable = []ProjectsTable{}
+	if err := json.Unmarshal(bytes, &res); err != nil {
+		return ProjectsTable{}, err
 	}
 
-	return nil
+	return res[0], nil
 }
 
 func (s *SupabaseStore) UpdateProject(id, userId, name string) error {

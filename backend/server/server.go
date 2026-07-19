@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/cloudflare"
 	"github.com/timmyjinks/tysoncloud/config"
+	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
 )
 
@@ -15,6 +16,7 @@ type Application struct {
 	Config       config.Config
 	Supabase     *store.SupabaseStore
 	Cloudflare   *cloudflare.CloudflareService
+	Deploy       *deploy.DeployService
 	TaskRegistry *TaskRegistry
 }
 

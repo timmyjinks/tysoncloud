@@ -22,6 +22,13 @@ type ServicesTable struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type PostgrestError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Details string `json:"details"`
+	Hint    string `json:"hint"`
+}
+
 func (s *SupabaseStore) GetService(id, userId string) (ServicesTable, error) {
 	res, _, err := s.cli.From("services").
 		Select("*, projects!inner(user_id)", "exact", false).
@@ -61,42 +68,59 @@ func (s *SupabaseStore) GetServices(projectId, userId string) ([]ServicesTable, 
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateService(userId, projectId, name, image string) error {
-	_, _, err := s.cli.From("services").Insert(struct {
-		UserId    string `json:"user_id"`
-		ProjectId string `json:"project_id"`
-		Name      string `json:"name"`
-		Image     string `json:"image"`
-	}{
-		UserId:    userId,
-		ProjectId: projectId,
-		Name:      name,
-		Image:     image,
-	}, false, "", "", "").Execute()
-	if err != nil {
-		return err
+func (s *SupabaseStore) CreateService(userId, projectId, name, image string, port int32) (ServicesTable, error) {
+	result := s.cli.Rpc("create_service", "", map[string]interface{}{
+		"p_project_id": projectId,
+		"p_user_id":    userId,
+		"p_name":       name,
+		"p_image":      image,
+		"p_port":       port,
+	})
+
+	var res ServicesTable
+	if err := json.Unmarshal([]byte(result), &res); err != nil {
+		return ServicesTable{}, nil
 	}
-	return nil
+
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return ServicesTable{}, fmt.Errorf("create_service failed: %s", pgErr.Message)
+	}
+
+	return res, nil
 }
 
-func (s *SupabaseStore) UpdateService(id, userId, name, image string) error {
-	_ = s.cli.Rpc("update_service", "", map[string]interface{}{
+func (s *SupabaseStore) UpdateService(id, userId, name, image string) (ServicesTable, error) {
+	result := s.cli.Rpc("update_service", "", map[string]interface{}{
 		"p_id":      id,
 		"p_user_id": userId,
 		"p_name":    name,
 		"p_image":   image,
 	})
 
-	return nil
+	var res ServicesTable
+	if err := json.Unmarshal([]byte(result), &res); err != nil {
+		return ServicesTable{}, nil
+	}
+
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return ServicesTable{}, fmt.Errorf("create_service failed: %s", pgErr.Message)
+	}
+
+	return res, nil
 }
 
 func (s *SupabaseStore) DeleteService(id, userId string) error {
-	res := s.cli.Rpc("delete_service", "", map[string]interface{}{
+	result := s.cli.Rpc("delete_service", "", map[string]interface{}{
 		"p_id":      id,
 		"p_user_id": userId,
 	})
 
-	fmt.Println(res)
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return fmt.Errorf("create_service failed: %s", pgErr.Message)
+	}
 
 	return nil
 }

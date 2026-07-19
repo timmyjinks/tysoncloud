@@ -10,8 +10,9 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/joho/godotenv v1.5.1
-	github.com/supabase-community/postgrest-go v0.0.11
-	github.com/supabase-community/supabase-go v0.0.5-0.20250912034549-9f6d333f052a
+	github.com/supabase-community/gotrue-go v1.2.0
+	github.com/supabase-community/postgrest-go v0.0.12
+	github.com/supabase-community/supabase-go v0.0.4
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
 	k8s.io/client-go v0.36.2
@@ -62,7 +63,6 @@ require (
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/supabase-community/auth-go v1.5.0 // indirect
 	github.com/supabase-community/functions-go v0.0.0-20220927045802-22373e6cb51d // indirect
 	github.com/supabase-community/storage-go v0.7.0 // indirect
 	github.com/thoas/go-funk v0.9.3 // indirect

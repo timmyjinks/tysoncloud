@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supabase-community/auth-go/types"
+	"github.com/supabase-community/gotrue-go/types"
 	"github.com/supabase-community/supabase-go"
 )
 

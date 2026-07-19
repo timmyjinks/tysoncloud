@@ -22,16 +22,15 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
 
-	r.Handle("/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("GET")
-	r.Handle("/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("POST")
-	r.Handle("/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("PUT")
-	r.Handle("/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
+	r.Handle("/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetVolume))).Methods("GET")
+	r.Handle("/projects/{project_id}/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateVolume))).Methods("POST")
+	r.Handle("/projects/{project_id}/services/{service_id}/volumes", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteVolume))).Methods("DELETE")
 
 	r.Handle("/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetService))).Methods("GET")
-	r.Handle("/projects/{database_id}/databases", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetServices))).Methods("GET")
-	r.Handle("/projects/{database_id}/databases", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateService))).Methods("POST")
-	r.Handle("/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateService))).Methods("PUT")
-	r.Handle("/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
+	r.Handle("/projects/{project_id}/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetServices))).Methods("GET")
+	r.Handle("/projects/{project_id}/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateService))).Methods("POST")
+	r.Handle("/projects/{project_id}/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateService))).Methods("PUT")
+	r.Handle("/projects/{project_id}/databases/{database_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
 
 	r.HandleFunc("/services/{service_id}/logs", nil).Methods("GET")
 	r.HandleFunc("/tasks/{task_id}", s.HandleTaskWS)

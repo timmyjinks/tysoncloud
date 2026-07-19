@@ -2,11 +2,64 @@ package server
 
 import (
 	"errors"
+	"time"
 )
 
+type VolumeResponse struct {
+	Id        string    `json:"id"`
+	ServiceId string    `json:"service_id"`
+	MountPath string    `json:"mount_path"`
+	StorageGB int32     `json:"storage_gb"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type VolumeCreateRequest struct {
+	MountPath string `json:"mount_path"`
+	StorageGB int32  `json:"storage_gb"`
+}
+
+type DatabaseResponse struct {
+	Id             string    `json:"id"`
+	ProejctId      string    `json:"project_id"`
+	Name           string    `json:"name"`
+	Image          string    `json:"image"`
+	Port           string    `json:"port"`
+	Status         string    `json:"status"`
+	PublicDomain   string    `json:"public_domain"`
+	InternalDomain string    `json:"private_domain"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type DatabaseCreateRequest struct {
+	Name  string `json:"name"`
+	Image string `json:"image"`
+	Port  int32  `json:"port"`
+}
+
+type DatabaseCreateResponse struct {
+	TaskId string `json:"task_id"`
+}
+
+type DatabaseUpdateRequest struct {
+	Name  *string `json:"name,omitempty"`
+	Image *string `json:"image,omitempty"`
+	Port  *int32  `json:"port,omitempty"`
+}
+
+type DatabaseDeleteRequest struct {
+	Id string `json:"id"`
+}
+
 type ServiceResponse struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id             string    `json:"id"`
+	ProejctId      string    `json:"project_id"`
+	Name           string    `json:"name"`
+	Image          string    `json:"image"`
+	Port           string    `json:"port"`
+	Status         string    `json:"status"`
+	PublicDomain   string    `json:"public_domain"`
+	InternalDomain string    `json:"private_domain"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type ServiceCreateRequest struct {

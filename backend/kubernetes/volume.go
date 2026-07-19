@@ -44,3 +44,56 @@ func (d *KubernetesService) CreatePVC(ctx context.Context, resource Resource) er
 func (d *KubernetesService) DeletePVC(ctx context.Context, resource Resource) error {
 	return d.clientset.CoreV1().PersistentVolumeClaims(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
 }
+
+func (d *KubernetesService) AttachPVCToDeployment(ctx context.Context, resource Resource) error {
+	deployment, err := d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Get(ctx, resource.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	volumeName := "vol-" + resource.Name
+
+	deployment.Spec.Template.Spec.Volumes = []corev1.Volume{
+		{
+			Name: volumeName,
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: resource.Name,
+				},
+			},
+		},
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+		{
+			Name:      volumeName,
+			MountPath: resource.MountPath,
+		},
+	}
+
+	_, err = d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Update(ctx, deployment, metav1.UpdateOptions{})
+	return err
+}
+
+func (d *KubernetesService) DetachPVCToDeployment(ctx context.Context, resource Resource) error {
+	deployment, err := d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Get(ctx, resource.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	deployment.Spec.Template.Spec.Volumes = nil
+	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = nil
+
+	d.DeletePVC(ctx, resource)
+
+	_, err = d.clientset.AppsV1().
+		Deployments(resource.Namespace).
+		Update(ctx, deployment, metav1.UpdateOptions{})
+	return err
+}

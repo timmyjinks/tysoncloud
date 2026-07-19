@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
@@ -35,9 +36,9 @@ func NewTaskRegistry() *TaskRegistry {
 }
 
 func (app *Application) HandleTaskWS(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
+	taskId := mux.Vars(r)["taskId"]
 
-	if id == "" {
+	if taskId == "" {
 		http.Error(w, "Id is empty", http.StatusBadRequest)
 		return
 	}
@@ -54,7 +55,7 @@ func (app *Application) HandleTaskWS(w http.ResponseWriter, r *http.Request) {
 	defer ws.Close()
 
 	app.TaskRegistry.mu.Lock()
-	task := app.TaskRegistry.registry[id]
+	task := app.TaskRegistry.registry[taskId]
 	app.TaskRegistry.mu.Unlock()
 
 	for message := range task {
@@ -73,6 +74,6 @@ func (app *Application) HandleTaskWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app.TaskRegistry.mu.Lock()
-	delete(app.TaskRegistry.registry, id)
+	delete(app.TaskRegistry.registry, taskId)
 	app.TaskRegistry.mu.Unlock()
 }

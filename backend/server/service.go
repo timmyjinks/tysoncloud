@@ -175,7 +175,7 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 }
 
 func ToServicesResponse(servicesTable []store.ServicesTable) []ServiceResponse {
-	var services []ServiceResponse
+	var services []ServiceResponse = []ServiceResponse{}
 	for _, service := range servicesTable {
 		services = append(services, ServiceResponse{
 			Id:   service.Id,

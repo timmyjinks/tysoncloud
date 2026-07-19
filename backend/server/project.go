@@ -162,7 +162,7 @@ func (app *Application) DeleteProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func ToProjectsResponse(projectsTable []store.ProjectsTable) []ProjectResponse {
-	var projects []ProjectResponse
+	var projects []ProjectResponse = []ProjectResponse{}
 	for _, project := range projectsTable {
 		projects = append(projects, ProjectResponse{
 			Id:   project.Id,

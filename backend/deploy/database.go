@@ -20,3 +20,15 @@ func (d *DeployService) CreateDatabase(ctx context.Context, database Database) e
 		return errors.New("DB engine not found")
 	}
 }
+
+func (d *DeployService) DeleteDatabase(ctx context.Context, database Database) error {
+	switch database.Engine {
+	case "postgres":
+		return d.svc.DeletePostgresDatabase(ctx, kubernetes.Resource{
+			Namespace: database.Namespace,
+			Name:      database.Name,
+		})
+	default:
+		return errors.New("DB engine not found")
+	}
+}

@@ -20,30 +20,25 @@ type VolumeCreateRequest struct {
 
 type DatabaseResponse struct {
 	Id             string    `json:"id"`
-	ProejctId      string    `json:"project_id"`
+	ProjectId      string    `json:"project_id"`
 	Name           string    `json:"name"`
-	Image          string    `json:"image"`
-	Port           string    `json:"port"`
-	Status         string    `json:"status"`
-	PublicDomain   string    `json:"public_domain"`
-	InternalDomain string    `json:"private_domain"`
+	Engine         string    `json:"engine"`
+	Port           int32     `json:"port"`
+	Storage        int32     `json:"storage"`
+	InternalDomain string    `json:"internal_domain"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
 type DatabaseCreateRequest struct {
-	Name  string `json:"name"`
-	Image string `json:"image"`
-	Port  int32  `json:"port"`
-}
-
-type DatabaseCreateResponse struct {
-	TaskId string `json:"task_id"`
+	Name      string `json:"name"`
+	Engine    string `json:"image"`
+	StorageGB int32  `json:"storage_gb"`
 }
 
 type DatabaseUpdateRequest struct {
-	Name  *string `json:"name,omitempty"`
-	Image *string `json:"image,omitempty"`
-	Port  *int32  `json:"port,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	Engine    *string `json:"engine,omitempty"`
+	StorageGB *int32  `json:"storage_gb"`
 }
 
 type DatabaseDeleteRequest struct {
@@ -52,7 +47,7 @@ type DatabaseDeleteRequest struct {
 
 type ServiceResponse struct {
 	Id             string    `json:"id"`
-	ProejctId      string    `json:"project_id"`
+	ProjectId      string    `json:"project_id"`
 	Name           string    `json:"name"`
 	Image          string    `json:"image"`
 	Port           string    `json:"port"`

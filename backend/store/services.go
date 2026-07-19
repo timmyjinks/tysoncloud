@@ -90,12 +90,13 @@ func (s *SupabaseStore) CreateService(userId, projectId, name, image string, por
 	return res, nil
 }
 
-func (s *SupabaseStore) UpdateService(id, userId, name, image string) (ServicesTable, error) {
+func (s *SupabaseStore) UpdateService(id, userId, name, image string, port int32) (ServicesTable, error) {
 	result := s.cli.Rpc("update_service", "", map[string]interface{}{
 		"p_id":      id,
 		"p_user_id": userId,
 		"p_name":    name,
 		"p_image":   image,
+		"p_port":    port,
 	})
 
 	var res ServicesTable

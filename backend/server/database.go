@@ -10,9 +10,10 @@ import (
 	"github.com/timmyjinks/tysoncloud/store"
 )
 
-var invalidServiceId error = errors.New("service with id not found")
+var invalidDatabaseId error = errors.New("database with id not found")
+var invalidPort error = errors.New("no port found for engine")
 
-func (app *Application) GetService(w http.ResponseWriter, r *http.Request) {
+func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 	serviceId := mux.Vars(r)["service_id"]
 	if serviceId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
@@ -31,20 +32,28 @@ func (app *Application) GetService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	service, err := app.Supabase.GetService(serviceId, user.ID.String())
+	database, err := app.Supabase.GetDatabase(serviceId, user.ID.String())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(ServiceResponse{Id: service.Id, Name: service.Name}); err != nil {
+	if err := json.NewEncoder(w).Encode(DatabaseResponse{
+		Id:        database.Id,
+		ProjectId: database.ProjectId,
+		Name:      database.Name,
+		Engine:    database.Engine,
+		Port:      database.Port,
+		Storage:   database.StorageGB,
+		CreatedAt: database.CreatedAt,
+	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
+func (app *Application) GetDatabases(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 	if projectId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
@@ -63,24 +72,30 @@ func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services, err := app.Supabase.GetServices(projectId, user.ID.String())
+	services, err := app.Supabase.GetDatabases(projectId, user.ID.String())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(ToServicesResponse(services)); err != nil {
+	if err := json.NewEncoder(w).Encode(ToDatabasesResponse(services)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
+func (app *Application) CreateDatabase(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 
-	var service ServiceCreateRequest
+	var service DatabaseCreateRequest
 	err := json.NewDecoder(r.Body).Decode(&service)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	port, err := getPort(service.Engine)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -98,51 +113,39 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := app.Supabase.CreateService(user.ID.String(), projectId, service.Name, service.Image, service.Port)
+	res, err := app.Supabase.CreateDatabase(user.ID.String(), projectId, service.Name, service.Engine, port, service.StorageGB)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
+	if err := app.Deploy.CreateDatabase(r.Context(), deploy.Database{
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,
-		Hostname:  res.PublicDomain,
-		Env:       map[string][]byte{},
-		Image:     service.Image,
-		Port:      service.Port,
+		Engine:    service.Engine,
+		StorageGB: service.StorageGB,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	if err := app.Cloudflare.CreateRecord(r.Context(), res.PublicDomain); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := app.Cloudflare.CreateRecord(r.Context(), res.PublicDomain); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
+func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 	if projectId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
 		return
 	}
 
-	serviceId := mux.Vars(r)["service_id"]
-	if serviceId == "" {
-		http.Error(w, invalidServiceId.Error(), http.StatusBadRequest)
+	databaseId := mux.Vars(r)["database_id"]
+	if databaseId == "" {
+		http.Error(w, invalidDatabaseId.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var service ServiceUpdateRequest
+	var service DatabaseUpdateRequest
 	err := json.NewDecoder(r.Body).Decode(&service)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -166,29 +169,27 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if service.Image == nil {
+	if service.Engine == nil {
 		http.Error(w, emptyImage.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if service.Port == nil {
+	if service.StorageGB == nil {
 		http.Error(w, emptyImage.Error(), http.StatusBadRequest)
 		return
 	}
 
-	res, err := app.Supabase.UpdateService(serviceId, user.ID.String(), *service.Name, *service.Image, *service.Port)
+	res, err := app.Supabase.UpdateDatabase(databaseId, user.ID.String(), *service.Name, *service.StorageGB)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
+	if err := app.Deploy.CreateDatabase(r.Context(), deploy.Database{
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,
-		Hostname:  res.PublicDomain,
-		Env:       map[string][]byte{},
-		Image:     *service.Image,
-		Port:      *service.Port,
+		Engine:    res.Engine,
+		StorageGB: *service.StorageGB,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
@@ -196,7 +197,7 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
+func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 	if projectId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
@@ -221,38 +222,42 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.DeleteService(serviceId, user.ID.String()); err != nil {
+	if err := app.Supabase.DeleteDatabase(serviceId, user.ID.String()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
+	if err := app.Deploy.DeleteDatabase(r.Context(), deploy.Database{
 		Namespace: "proj-" + projectId,
-		Name:      "svc-" + serviceId,
+		Name:      "db-" + serviceId,
 	}); err != nil {
-		return
-	}
-
-	if err := app.Cloudflare.DeleteRecord(r.Context(), "tc-"+serviceId); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := app.Cloudflare.DeleteRoute(r.Context(), "tc-"+serviceId); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(204)
 }
 
-func ToServicesResponse(servicesTable []store.ServicesTable) []ServiceResponse {
-	var services []ServiceResponse = []ServiceResponse{}
-	for _, service := range servicesTable {
-		services = append(services, ServiceResponse{
-			Id:   service.Id,
-			Name: service.Name,
+func ToDatabasesResponse(databasesTable []store.DatabasesTable) []DatabaseResponse {
+	var databases []DatabaseResponse = []DatabaseResponse{}
+	for _, database := range databasesTable {
+		databases = append(databases, DatabaseResponse{
+			Id:        database.Id,
+			ProjectId: database.ProjectId,
+			Name:      database.Name,
+			Engine:    database.Engine,
+			Port:      database.Port,
+			Storage:   database.StorageGB,
+			CreatedAt: database.CreatedAt,
 		})
 	}
-	return services
+	return databases
+}
+
+func getPort(engine string) (int32, error) {
+	switch engine {
+	case "postgres":
+		return 5432, nil
+	default:
+		return -1, invalidPort
+	}
 }

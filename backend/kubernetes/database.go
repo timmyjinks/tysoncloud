@@ -74,11 +74,11 @@ func (d *KubernetesService) CreatePostgresDatabase(ctx context.Context, resource
 	return nil
 }
 
-func (d *KubernetesService) DeletePostgresDatabase(resource Resource) error {
+func (d *KubernetesService) DeletePostgresDatabase(ctx context.Context, resource Resource) error {
 	gvr := schema.GroupVersionResource{
 		Group:    "postgresql.cnpg.io",
 		Version:  "v1",
 		Resource: "clusters",
 	}
-	return d.dynamicClient.Resource(gvr).Namespace(resource.Namespace).Delete(context.Background(), resource.Name, metav1.DeleteOptions{})
+	return d.dynamicClient.Resource(gvr).Namespace(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
 }

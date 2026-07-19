@@ -16,8 +16,8 @@ var invalidEngine error = errors.New("no engine found")
 var invalidStorageGB error = errors.New("no storage amount was specified")
 
 func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
-	serviceId := mux.Vars(r)["service_id"]
-	if serviceId == "" {
+	dataseId := mux.Vars(r)["database_id"]
+	if dataseId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
 		return
 	}
@@ -34,7 +34,7 @@ func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	database, err := app.Supabase.GetDatabase(serviceId, user.ID.String())
+	database, err := app.Supabase.GetDatabase(dataseId, user.ID.String())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

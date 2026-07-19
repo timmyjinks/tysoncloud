@@ -2,7 +2,6 @@ package store
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -55,7 +54,6 @@ func (s *SupabaseStore) CreateProject(userId, name string) (ProjectsTable, error
 	if err != nil {
 		return ProjectsTable{}, err
 	}
-	fmt.Println(string(bytes))
 
 	var res []ProjectsTable = []ProjectsTable{}
 	if err := json.Unmarshal(bytes, &res); err != nil {

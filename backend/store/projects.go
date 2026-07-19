@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -58,6 +59,10 @@ func (s *SupabaseStore) CreateProject(userId, name string) (ProjectsTable, error
 	var res []ProjectsTable = []ProjectsTable{}
 	if err := json.Unmarshal(bytes, &res); err != nil {
 		return ProjectsTable{}, err
+	}
+
+	if len(res) == 0 {
+		return ProjectsTable{}, errors.New("error creating project")
 	}
 
 	return res[0], nil

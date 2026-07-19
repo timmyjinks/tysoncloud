@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type VolumesTable struct {
 }
 
 func (s *SupabaseStore) GetVolume(serviceId string) (VolumesTable, error) {
-	res, _, err := s.cli.From("volumes").Select("*", "exact", false).Limit(1, "").Eq("service_id", serviceId).Single().Execute()
+	res, _, err := s.cli.From("volumes").Select("*", "exact", false).Eq("service_id", serviceId).Single().Execute()
 	if err != nil {
 		return VolumesTable{}, err
 	}
@@ -44,6 +45,10 @@ func (s *SupabaseStore) CreateVolume(serviceId, mountPath string, storageGB int3
 	var res []VolumesTable = []VolumesTable{}
 	if err := json.Unmarshal(bytes, &res); err != nil {
 		return VolumesTable{}, err
+	}
+
+	if len(res) == 0 {
+		return VolumesTable{}, errors.New("error creating volume")
 	}
 
 	return res[0], nil

@@ -12,6 +12,8 @@ import (
 
 var invalidDatabaseId error = errors.New("database with id not found")
 var invalidPort error = errors.New("no port found for engine")
+var invalidEngine error = errors.New("no engine found")
+var invalidStorageGB error = errors.New("no storage amount was specified")
 
 func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 	serviceId := mux.Vars(r)["service_id"]
@@ -170,12 +172,12 @@ func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if service.Engine == nil {
-		http.Error(w, emptyImage.Error(), http.StatusBadRequest)
+		http.Error(w, invalidEngine.Error(), http.StatusBadRequest)
 		return
 	}
 
 	if service.StorageGB == nil {
-		http.Error(w, emptyImage.Error(), http.StatusBadRequest)
+		http.Error(w, invalidStorageGB.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -204,8 +206,8 @@ func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	serviceId := mux.Vars(r)["service_id"]
-	if serviceId == "" {
+	databaseId := mux.Vars(r)["database_id"]
+	if databaseId == "" {
 		http.Error(w, "project with id not found", http.StatusBadRequest)
 		return
 	}
@@ -222,14 +224,14 @@ func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.DeleteDatabase(serviceId, user.ID.String()); err != nil {
+	if err := app.Supabase.DeleteDatabase(databaseId, user.ID.String()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := app.Deploy.DeleteDatabase(r.Context(), deploy.Database{
 		Namespace: "proj-" + projectId,
-		Name:      "db-" + serviceId,
+		Name:      "db-" + databaseId,
 	}); err != nil {
 		return
 	}

@@ -121,7 +121,7 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Cloudflare.CreateRecord(r.Context(), res.PublicDomain); err != nil {
+	if err := app.Cloudflare.CreateRoute(r.Context(), res.PublicDomain); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

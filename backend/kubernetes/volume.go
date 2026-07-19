@@ -90,8 +90,6 @@ func (d *KubernetesService) DetachPVCToDeployment(ctx context.Context, resource 
 	deployment.Spec.Template.Spec.Volumes = nil
 	deployment.Spec.Template.Spec.Containers[0].VolumeMounts = nil
 
-	d.DeletePVC(ctx, resource)
-
 	_, err = d.clientset.AppsV1().
 		Deployments(resource.Namespace).
 		Update(ctx, deployment, metav1.UpdateOptions{})

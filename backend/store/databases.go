@@ -26,12 +26,12 @@ func (s *SupabaseStore) GetDatabase(projectId, userId string) (DatabasesTable, e
 		return DatabasesTable{}, err
 	}
 
-	var table []DatabasesTable = []DatabasesTable{}
+	var table DatabasesTable
 	if err := json.Unmarshal(res, &table); err != nil {
 		return DatabasesTable{}, err
 	}
 
-	return table[0], nil
+	return table, nil
 }
 
 func (s *SupabaseStore) GetDatabases(projectId, userId string) ([]DatabasesTable, error) {
@@ -60,7 +60,7 @@ func (s *SupabaseStore) CreateDatabase(userId, projectId, name, engine string, p
 
 	var res DatabasesTable
 	if err := json.Unmarshal([]byte(result), &res); err != nil {
-		return DatabasesTable{}, nil
+		return DatabasesTable{}, err
 	}
 
 	var pgErr PostgrestError
@@ -81,7 +81,7 @@ func (s *SupabaseStore) UpdateDatabase(id, userId, name string, storageGB int32)
 
 	var res DatabasesTable
 	if err := json.Unmarshal([]byte(result), &res); err != nil {
-		return DatabasesTable{}, nil
+		return DatabasesTable{}, err
 	}
 
 	var pgErr PostgrestError

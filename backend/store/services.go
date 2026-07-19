@@ -79,7 +79,7 @@ func (s *SupabaseStore) CreateService(userId, projectId, name, image string, por
 
 	var res ServicesTable
 	if err := json.Unmarshal([]byte(result), &res); err != nil {
-		return ServicesTable{}, nil
+		return ServicesTable{}, err
 	}
 
 	var pgErr PostgrestError
@@ -101,7 +101,7 @@ func (s *SupabaseStore) UpdateService(id, userId, name, image string, port int32
 
 	var res ServicesTable
 	if err := json.Unmarshal([]byte(result), &res); err != nil {
-		return ServicesTable{}, nil
+		return ServicesTable{}, err
 	}
 
 	var pgErr PostgrestError

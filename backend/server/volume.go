@@ -17,7 +17,7 @@ func (app *Application) GetVolume(w http.ResponseWriter, r *http.Request) {
 
 	volume, err := app.Supabase.GetVolume(serviceId)
 	if err != nil {
-		w.Write([]byte("[]"))
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
@@ -85,10 +85,11 @@ func (app *Application) DeleteVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Deploy.DeattachVolume(r.Context(), deploy.Service{
+	if err := app.Deploy.DetachVolume(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
 		Name:      "svc-" + serviceId,
 	}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

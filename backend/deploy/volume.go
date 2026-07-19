@@ -21,7 +21,7 @@ func (d *DeployService) AttachVolume(ctx context.Context, service Service, volum
 	return nil
 }
 
-func (d *DeployService) DeattachVolume(ctx context.Context, service Service) error {
+func (d *DeployService) DetachVolume(ctx context.Context, service Service) error {
 	resource := ServiceToResource(service)
 
 	err := d.svc.DetachPVCToDeployment(ctx, resource)

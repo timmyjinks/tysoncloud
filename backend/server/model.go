@@ -31,7 +31,7 @@ type DatabaseResponse struct {
 
 type DatabaseCreateRequest struct {
 	Name      string `json:"name"`
-	Engine    string `json:"image"`
+	Engine    string `json:"engine"`
 	StorageGB int32  `json:"storage_gb"`
 }
 
@@ -50,7 +50,7 @@ type ServiceResponse struct {
 	ProjectId      string    `json:"project_id"`
 	Name           string    `json:"name"`
 	Image          string    `json:"image"`
-	Port           string    `json:"port"`
+	Port           int32     `json:"port"`
 	Status         string    `json:"status"`
 	PublicDomain   string    `json:"public_domain"`
 	InternalDomain string    `json:"private_domain"`

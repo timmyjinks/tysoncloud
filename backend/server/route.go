@@ -16,10 +16,11 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateProject))).Methods("PUT")
 	r.Handle("/projects/{project_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteProject))).Methods("DELETE")
 
-	r.HandleFunc("/projects/{project_id}/services", nil).Methods("GET")
-	r.HandleFunc("/projects/{project_id}/services", nil).Methods("POST")
-	r.HandleFunc("/projects/{project_id}/services", nil).Methods("PUT")
-	r.HandleFunc("/projects/{project_id}/services", nil).Methods("DELETE")
+	r.Handle("/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetService))).Methods("GET")
+	r.Handle("/projects/{project_id}/services", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetServices))).Methods("GET")
+	r.Handle("/projects/{project_id}/services", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateService))).Methods("POST")
+	r.Handle("/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateService))).Methods("PUT")
+	r.Handle("/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
 
 	r.HandleFunc("/services/{service_id}/logs", nil).Methods("GET")
 	r.HandleFunc("/tasks/{task_id}", s.HandleTaskWS)

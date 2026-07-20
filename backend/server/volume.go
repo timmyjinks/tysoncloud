@@ -48,7 +48,19 @@ func (app *Application) CreateVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := app.Supabase.CreateVolume(serviceId, service.MountPath, service.StorageGB); err != nil {
+	client := ClientFromContext(r.Context())
+	if client == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := client.Auth.GetUser()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if _, err := app.Supabase.CreateVolume(serviceId, user.ID.String(), service.MountPath, service.StorageGB); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -80,7 +92,19 @@ func (app *Application) DeleteVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Supabase.DeleteVolume(serviceId); err != nil {
+	client := ClientFromContext(r.Context())
+	if client == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	user, err := client.Auth.GetUser()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if err := app.Supabase.DeleteVolume(serviceId, user.ID.String()); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

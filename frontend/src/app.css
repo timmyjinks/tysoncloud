@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+  TYSONCLOUD design tokens
+  ------------------------
+  Direction: a deploy platform built on real infrastructure, not a marketing
+  site. The palette, type, and card language are drawn from the tools our
+  users already live in — an editor (Zed), a systems database (TigerBeetle),
+  a deploy platform (Railway) — blended into one consistent system rather
+  than switched per page.
+
+  - Display/utility type is monospace throughout (JetBrains Mono): headlines,
+    IDs, ports, domains, env vars all read like they came from a terminal,
+    because on this product they basically did.
+  - Body copy is IBM Plex Sans — quieter, built for paragraphs.
+  - One accent (violet) carries brand and interactive state. Status color
+    (green/amber/red) is reserved strictly for real infra state — never
+    decorative.
+*/
+
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg: #08090b;
+  --color-surface: #111214;
+  --color-surface-2: #17181b;
+  --color-surface-hover: #1c1d21;
+  --color-border: #232428;
+  --color-border-strong: #313236;
+
+  --color-text: #f3f3f5;
+  --color-text-muted: #9a9aa4;
+  --color-text-faint: #57575f;
+
+  --color-accent: #6e56cf;
+  --color-accent-hover: #7f68e0;
+  --color-accent-soft: #6e56cf1a;
+
+  --color-good: #35d68a;
+  --color-good-soft: #35d68a1a;
+  --color-bad: #f0453c;
+  --color-bad-soft: #f0453c1a;
+  --color-warn: #f2a93b;
+  --color-warn-soft: #f2a93b1a;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Signature element: the "terminal strip" — a monospace status line used
+   at the top of every resource card, styled like a shell prompt. It's the
+   one recurring motif that ties the dashboard back to the thing it manages:
+   containers, ports, processes. */
+.terminal-strip {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: -0.01em;
+  color: var(--color-text-faint);
+}
+
+.terminal-strip .prompt {
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

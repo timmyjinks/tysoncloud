@@ -10,128 +10,199 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AboutRouteImport } from './routes/about'
-import { Route as ApiRemyChatRouteImport } from './routes/api.remy-chat'
-import { Route as ScheduleIndexRouteImport } from './routes/schedule.index'
-import { Route as SpeakersIndexRouteImport } from './routes/speakers.index'
-import { Route as SpeakersSlugRouteImport } from './routes/speakers.$slug'
-import { Route as TalksIndexRouteImport } from './routes/talks.index'
-import { Route as TalksSlugRouteImport } from './routes/talks.$slug'
+import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardNewRouteImport } from './routes/dashboard/new'
+import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$projectId/route'
+import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
+import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
+import { Route as ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport } from './routes/projects/$projectId/databases/$databaseId/index'
+import { Route as ProjectsProjectIdDatabasesDatabaseIdEditRouteImport } from './routes/projects/$projectId/databases/$databaseId/edit'
+import { Route as ProjectsProjectIdServicesServiceIdIndexRouteImport } from './routes/projects/$projectId/services/$serviceId/index'
+import { Route as ProjectsProjectIdServicesServiceIdEditRouteImport } from './routes/projects/$projectId/services/$serviceId/edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
+const DashboardRouteRoute = DashboardRouteRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiRemyChatRoute = ApiRemyChatRouteImport.update({
-  id: '/api/remy-chat',
-  path: '/api/remy-chat',
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ScheduleIndexRoute = ScheduleIndexRouteImport.update({
-  id: '/schedule/',
-  path: '/schedule/',
+const SignUpRoute = SignUpRouteImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SpeakersIndexRoute = SpeakersIndexRouteImport.update({
-  id: '/speakers/',
-  path: '/speakers/',
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardNewRoute = DashboardNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const ProjectsProjectIdRouteRoute = ProjectsProjectIdRouteRouteImport.update({
+  id: '/projects/$projectId',
+  path: '/projects/$projectId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SpeakersSlugRoute = SpeakersSlugRouteImport.update({
-  id: '/speakers/$slug',
-  path: '/speakers/$slug',
-  getParentRoute: () => rootRouteImport,
+const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectsProjectIdRouteRoute,
 } as any)
-const TalksIndexRoute = TalksIndexRouteImport.update({
-  id: '/talks/',
-  path: '/talks/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const TalksSlugRoute = TalksSlugRouteImport.update({
-  id: '/talks/$slug',
-  path: '/talks/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const ProjectsProjectIdDatabasesNewRoute =
+  ProjectsProjectIdDatabasesNewRouteImport.update({
+    id: '/databases/new',
+    path: '/databases/new',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdServicesNewRoute =
+  ProjectsProjectIdServicesNewRouteImport.update({
+    id: '/services/new',
+    path: '/services/new',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdDatabasesDatabaseIdIndexRoute =
+  ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport.update({
+    id: '/databases/$databaseId/',
+    path: '/databases/$databaseId/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdDatabasesDatabaseIdEditRoute =
+  ProjectsProjectIdDatabasesDatabaseIdEditRouteImport.update({
+    id: '/databases/$databaseId/edit',
+    path: '/databases/$databaseId/edit',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdServicesServiceIdIndexRoute =
+  ProjectsProjectIdServicesServiceIdIndexRouteImport.update({
+    id: '/services/$serviceId/',
+    path: '/services/$serviceId/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdServicesServiceIdEditRoute =
+  ProjectsProjectIdServicesServiceIdEditRouteImport.update({
+    id: '/services/$serviceId/edit',
+    path: '/services/$serviceId/edit',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/api/remy-chat': typeof ApiRemyChatRoute
-  '/speakers/$slug': typeof SpeakersSlugRoute
-  '/talks/$slug': typeof TalksSlugRoute
-  '/schedule/': typeof ScheduleIndexRoute
-  '/speakers/': typeof SpeakersIndexRoute
-  '/talks/': typeof TalksIndexRoute
+  '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
+  '/dashboard/new': typeof DashboardNewRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
+  '/projects/$projectId/databases/$databaseId/': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/services/$serviceId/': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/api/remy-chat': typeof ApiRemyChatRoute
-  '/speakers/$slug': typeof SpeakersSlugRoute
-  '/talks/$slug': typeof TalksSlugRoute
-  '/schedule': typeof ScheduleIndexRoute
-  '/speakers': typeof SpeakersIndexRoute
-  '/talks': typeof TalksIndexRoute
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/dashboard/new': typeof DashboardNewRoute
+  '/dashboard': typeof DashboardIndexRoute
+  '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
+  '/projects/$projectId/databases/$databaseId': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/services/$serviceId': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/about': typeof AboutRoute
-  '/api/remy-chat': typeof ApiRemyChatRoute
-  '/speakers/$slug': typeof SpeakersSlugRoute
-  '/talks/$slug': typeof TalksSlugRoute
-  '/schedule/': typeof ScheduleIndexRoute
-  '/speakers/': typeof SpeakersIndexRoute
-  '/talks/': typeof TalksIndexRoute
+  '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/sign-up': typeof SignUpRoute
+  '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
+  '/dashboard/new': typeof DashboardNewRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
+  '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
+  '/projects/$projectId/databases/$databaseId/': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/services/$serviceId/': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/about'
-    | '/api/remy-chat'
-    | '/speakers/$slug'
-    | '/talks/$slug'
-    | '/schedule/'
-    | '/speakers/'
-    | '/talks/'
+    | '/dashboard'
+    | '/sign-in'
+    | '/sign-up'
+    | '/projects/$projectId'
+    | '/dashboard/new'
+    | '/dashboard/'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/services/new'
+    | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/services/$serviceId/edit'
+    | '/projects/$projectId/databases/$databaseId/'
+    | '/projects/$projectId/services/$serviceId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/about'
-    | '/api/remy-chat'
-    | '/speakers/$slug'
-    | '/talks/$slug'
-    | '/schedule'
-    | '/speakers'
-    | '/talks'
+    | '/sign-in'
+    | '/sign-up'
+    | '/dashboard/new'
+    | '/dashboard'
+    | '/projects/$projectId'
+    | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/services/new'
+    | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/services/$serviceId/edit'
+    | '/projects/$projectId/databases/$databaseId'
+    | '/projects/$projectId/services/$serviceId'
   id:
     | '__root__'
     | '/'
-    | '/about'
-    | '/api/remy-chat'
-    | '/speakers/$slug'
-    | '/talks/$slug'
-    | '/schedule/'
-    | '/speakers/'
-    | '/talks/'
+    | '/dashboard'
+    | '/sign-in'
+    | '/sign-up'
+    | '/projects/$projectId'
+    | '/dashboard/new'
+    | '/dashboard/'
+    | '/projects/$projectId/'
+    | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/services/new'
+    | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/services/$serviceId/edit'
+    | '/projects/$projectId/databases/$databaseId/'
+    | '/projects/$projectId/services/$serviceId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AboutRoute: typeof AboutRoute
-  ApiRemyChatRoute: typeof ApiRemyChatRoute
-  SpeakersSlugRoute: typeof SpeakersSlugRoute
-  TalksSlugRoute: typeof TalksSlugRoute
-  ScheduleIndexRoute: typeof ScheduleIndexRoute
-  SpeakersIndexRoute: typeof SpeakersIndexRoute
-  TalksIndexRoute: typeof TalksIndexRoute
+  DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
+  SignInRoute: typeof SignInRoute
+  SignUpRoute: typeof SignUpRoute
+  ProjectsProjectIdRouteRoute: typeof ProjectsProjectIdRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -143,77 +214,151 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/remy-chat': {
-      id: '/api/remy-chat'
-      path: '/api/remy-chat'
-      fullPath: '/api/remy-chat'
-      preLoaderRoute: typeof ApiRemyChatRouteImport
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/schedule/': {
-      id: '/schedule/'
-      path: '/schedule'
-      fullPath: '/schedule/'
-      preLoaderRoute: typeof ScheduleIndexRouteImport
+    '/sign-up': {
+      id: '/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof SignUpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/speakers/': {
-      id: '/speakers/'
-      path: '/speakers'
-      fullPath: '/speakers/'
-      preLoaderRoute: typeof SpeakersIndexRouteImport
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/dashboard/new': {
+      id: '/dashboard/new'
+      path: '/new'
+      fullPath: '/dashboard/new'
+      preLoaderRoute: typeof DashboardNewRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/projects/$projectId': {
+      id: '/projects/$projectId'
+      path: '/projects/$projectId'
+      fullPath: '/projects/$projectId'
+      preLoaderRoute: typeof ProjectsProjectIdRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/speakers/$slug': {
-      id: '/speakers/$slug'
-      path: '/speakers/$slug'
-      fullPath: '/speakers/$slug'
-      preLoaderRoute: typeof SpeakersSlugRouteImport
-      parentRoute: typeof rootRouteImport
+    '/projects/$projectId/': {
+      id: '/projects/$projectId/'
+      path: '/'
+      fullPath: '/projects/$projectId/'
+      preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
     }
-    '/talks/': {
-      id: '/talks/'
-      path: '/talks'
-      fullPath: '/talks/'
-      preLoaderRoute: typeof TalksIndexRouteImport
-      parentRoute: typeof rootRouteImport
+    '/projects/$projectId/databases/new': {
+      id: '/projects/$projectId/databases/new'
+      path: '/databases/new'
+      fullPath: '/projects/$projectId/databases/new'
+      preLoaderRoute: typeof ProjectsProjectIdDatabasesNewRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
     }
-    '/talks/$slug': {
-      id: '/talks/$slug'
-      path: '/talks/$slug'
-      fullPath: '/talks/$slug'
-      preLoaderRoute: typeof TalksSlugRouteImport
-      parentRoute: typeof rootRouteImport
+    '/projects/$projectId/services/new': {
+      id: '/projects/$projectId/services/new'
+      path: '/services/new'
+      fullPath: '/projects/$projectId/services/new'
+      preLoaderRoute: typeof ProjectsProjectIdServicesNewRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/databases/$databaseId/': {
+      id: '/projects/$projectId/databases/$databaseId/'
+      path: '/databases/$databaseId'
+      fullPath: '/projects/$projectId/databases/$databaseId/'
+      preLoaderRoute: typeof ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/databases/$databaseId/edit': {
+      id: '/projects/$projectId/databases/$databaseId/edit'
+      path: '/databases/$databaseId/edit'
+      fullPath: '/projects/$projectId/databases/$databaseId/edit'
+      preLoaderRoute: typeof ProjectsProjectIdDatabasesDatabaseIdEditRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/services/$serviceId/': {
+      id: '/projects/$projectId/services/$serviceId/'
+      path: '/services/$serviceId'
+      fullPath: '/projects/$projectId/services/$serviceId/'
+      preLoaderRoute: typeof ProjectsProjectIdServicesServiceIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/services/$serviceId/edit': {
+      id: '/projects/$projectId/services/$serviceId/edit'
+      path: '/services/$serviceId/edit'
+      fullPath: '/projects/$projectId/services/$serviceId/edit'
+      preLoaderRoute: typeof ProjectsProjectIdServicesServiceIdEditRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
     }
   }
 }
 
+interface DashboardRouteRouteChildren {
+  DashboardNewRoute: typeof DashboardNewRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+}
+
+const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
+  DashboardNewRoute: DashboardNewRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+}
+
+const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
+  DashboardRouteRouteChildren,
+)
+
+interface ProjectsProjectIdRouteRouteChildren {
+  ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
+  ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
+  ProjectsProjectIdServicesNewRoute: typeof ProjectsProjectIdServicesNewRoute
+  ProjectsProjectIdDatabasesDatabaseIdEditRoute: typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  ProjectsProjectIdServicesServiceIdEditRoute: typeof ProjectsProjectIdServicesServiceIdEditRoute
+  ProjectsProjectIdDatabasesDatabaseIdIndexRoute: typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  ProjectsProjectIdServicesServiceIdIndexRoute: typeof ProjectsProjectIdServicesServiceIdIndexRoute
+}
+
+const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
+  {
+    ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
+    ProjectsProjectIdDatabasesNewRoute: ProjectsProjectIdDatabasesNewRoute,
+    ProjectsProjectIdServicesNewRoute: ProjectsProjectIdServicesNewRoute,
+    ProjectsProjectIdDatabasesDatabaseIdEditRoute:
+      ProjectsProjectIdDatabasesDatabaseIdEditRoute,
+    ProjectsProjectIdServicesServiceIdEditRoute:
+      ProjectsProjectIdServicesServiceIdEditRoute,
+    ProjectsProjectIdDatabasesDatabaseIdIndexRoute:
+      ProjectsProjectIdDatabasesDatabaseIdIndexRoute,
+    ProjectsProjectIdServicesServiceIdIndexRoute:
+      ProjectsProjectIdServicesServiceIdIndexRoute,
+  }
+
+const ProjectsProjectIdRouteRouteWithChildren =
+  ProjectsProjectIdRouteRoute._addFileChildren(
+    ProjectsProjectIdRouteRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AboutRoute: AboutRoute,
-  ApiRemyChatRoute: ApiRemyChatRoute,
-  SpeakersSlugRoute: SpeakersSlugRoute,
-  TalksSlugRoute: TalksSlugRoute,
-  ScheduleIndexRoute: ScheduleIndexRoute,
-  SpeakersIndexRoute: SpeakersIndexRoute,
-  TalksIndexRoute: TalksIndexRoute,
+  DashboardRouteRoute: DashboardRouteRouteWithChildren,
+  SignInRoute: SignInRoute,
+  SignUpRoute: SignUpRoute,
+  ProjectsProjectIdRouteRoute: ProjectsProjectIdRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

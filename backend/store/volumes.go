@@ -43,7 +43,7 @@ func (s *SupabaseStore) CreateVolume(serviceId, userId, mountPath string, storag
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
-		return VolumesTable{}, fmt.Errorf("create_service failed: %s", pgErr.Message)
+		return VolumesTable{}, fmt.Errorf("create_volume failed: %s", pgErr.Message)
 	}
 
 	return res, nil
@@ -57,7 +57,7 @@ func (s *SupabaseStore) DeleteVolume(serviceId, userId string) error {
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
-		return fmt.Errorf("create_service failed: %s", pgErr.Message)
+		return fmt.Errorf("delete_volume failed: %s", pgErr.Message)
 	}
 
 	return nil

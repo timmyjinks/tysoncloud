@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 
 	"github.com/caarlos0/env/v6"
@@ -28,9 +29,11 @@ type CloudflareConfig struct {
 }
 
 type Server struct {
-	Addr    string `toml:"addr" env:"ADDR"`
-	DistDir string `toml:"dist_dir" env:"DIST_DIR"`
-	Origin  string `toml:"host" env:"ORIGIN"`
+	Addr           string `toml:"addr" env:"ADDR"`
+	DistDir        string `toml:"dist_dir" env:"DIST_DIR"`
+	Origin         string `toml:"host" env:"ORIGIN"`
+	AllowedOrigins string `toml:"allowed_origins" env:"ALLOWED_ORIGINS"`
+	ClerkApiKey    string `env:"CLERK_API_KEY"`
 }
 
 type Supabase struct {
@@ -88,6 +91,17 @@ func (s *Server) InitDefaults() {
 	}
 	if s.Origin == "" {
 		s.Origin = "localhost:3000"
+	}
+	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOriginsEnv != "" {
+		s.AllowedOrigins = allowedOriginsEnv
+	}
+	if s.AllowedOrigins == "" {
+		s.AllowedOrigins = "https://status.tysonjenkins.dev,https://tysoncloud.tysonjenkins.dev,https://tysoncloud-test.tysonjenkins.dev,http://localhost:3000"
+	}
+	clerkApiKey := os.Getenv("CLERK_API_KEY")
+	if clerkApiKey == "" {
+		slog.Warn("Clerk API key not set")
 	}
 }
 

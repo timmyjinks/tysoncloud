@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
@@ -19,26 +20,32 @@ func (app *Application) GetService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	service, err := app.Supabase.GetService(serviceId, user.ID.String())
+	service, err := app.Supabase.GetService(serviceId, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(ServiceResponse{Id: service.Id, Name: service.Name}); err != nil {
+	if err := json.NewEncoder(w).Encode(ServiceResponse{
+		Id:             service.Id,
+		ProjectId:      service.ProjectId,
+		Name:           service.Name,
+		Image:          service.Image,
+		Port:           service.Port,
+		Status:         service.Status,
+		PublicDomain:   service.PublicDomain,
+		InternalDomain: service.PrivateDomain,
+		CreatedAt:      service.CreatedAt,
+	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -51,19 +58,15 @@ func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	services, err := app.Supabase.GetServices(projectId, user.ID.String())
+	services, err := app.Supabase.GetServices(projectId, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -86,19 +89,15 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	res, err := app.Supabase.CreateService(user.ID.String(), projectId, service.Name, service.Image, service.Port)
+	res, err := app.Supabase.CreateService(userId, projectId, service.Name, service.Image, service.Port)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -116,15 +115,15 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Cloudflare.CreateRecord(r.Context(), res.PublicDomain); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := app.Cloudflare.CreateRoute(r.Context(), res.PublicDomain); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// if err := app.Cloudflare.CreateRecord(r.Context(), res.PublicDomain); err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	//
+	// if err := app.Cloudflare.CreateRoute(r.Context(), res.PublicDomain); err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -250,8 +249,15 @@ func ToServicesResponse(servicesTable []store.ServicesTable) []ServiceResponse {
 	var services []ServiceResponse = []ServiceResponse{}
 	for _, service := range servicesTable {
 		services = append(services, ServiceResponse{
-			Id:   service.Id,
-			Name: service.Name,
+			Id:             service.Id,
+			ProjectId:      service.ProjectId,
+			Name:           service.Name,
+			Image:          service.Image,
+			Port:           service.Port,
+			Status:         service.Status,
+			PublicDomain:   service.PublicDomain,
+			InternalDomain: service.PrivateDomain,
+			CreatedAt:      service.CreatedAt,
 		})
 	}
 	return services

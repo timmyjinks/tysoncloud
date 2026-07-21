@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/timmyjinks/tysoncloud/cloudflare"
 	"github.com/timmyjinks/tysoncloud/config"
 	"github.com/timmyjinks/tysoncloud/db"
@@ -35,6 +36,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	clerk.SetKey(cfg.Server.ClerkApiKey)
 
 	taskRegistry := server.NewTaskRegistry()
 

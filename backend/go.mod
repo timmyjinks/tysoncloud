@@ -5,6 +5,7 @@ go 1.26.4
 require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/caarlos0/env/v6 v6.10.1
+	github.com/clerk/clerk-sdk-go/v2 v2.7.0
 	github.com/cloudflare/cloudflare-go/v6 v6.4.0
 	github.com/cloudnative-pg/cloudnative-pg v1.30.0
 	github.com/gorilla/mux v1.8.1
@@ -31,6 +32,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.23.1 // indirect
@@ -76,6 +78,7 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect

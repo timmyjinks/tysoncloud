@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/store"
 )
@@ -19,19 +20,15 @@ func (app *Application) GetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	project, err := app.Supabase.GetProject(projectId, user.ID.String())
+	project, err := app.Supabase.GetProject(projectId, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -45,19 +42,15 @@ func (app *Application) GetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Application) GetProjects(w http.ResponseWriter, r *http.Request) {
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	projects, err := app.Supabase.GetProjects(user.ID.String())
+	projects, err := app.Supabase.GetProjects(userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -71,6 +64,14 @@ func (app *Application) GetProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Application) CreateProject(w http.ResponseWriter, r *http.Request) {
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
+		return
+	}
+
+	userId := claims.Subject
+
 	var project ProjectCreateRequest
 	err := json.NewDecoder(r.Body).Decode(&project)
 	if err != nil {
@@ -78,19 +79,7 @@ func (app *Application) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	res, err := app.Supabase.CreateProject(user.ID.String(), project.Name)
+	res, err := app.Supabase.CreateProject(userId, project.Name)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -118,24 +107,20 @@ func (app *Application) UpdateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
 	if project.Name == nil {
 		http.Error(w, emptyName.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err := app.Supabase.UpdateProject(projectId, user.ID.String(), *project.Name); err != nil {
+	if err := app.Supabase.UpdateProject(projectId, userId, *project.Name); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -149,19 +134,15 @@ func (app *Application) DeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	if err := app.Supabase.DeleteProject(user.ID.String(), projectId); err != nil {
+	if err := app.Supabase.DeleteProject(userId, projectId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

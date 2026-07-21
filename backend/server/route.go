@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 
+	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/gorilla/mux"
 )
 
@@ -10,15 +11,18 @@ func (s *Application) registerRoutes(
 	r *mux.Router,
 ) error {
 
-	r.Handle("/projects/{project_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetProject))).Methods("GET")
-	r.Handle("/projects", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetProjects))).Methods("GET")
-	r.Handle("/projects", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateProject))).Methods("POST")
-	r.Handle("/projects/{project_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateProject))).Methods("PUT")
-	r.Handle("/projects/{project_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteProject))).Methods("DELETE")
+	r.Use(s.CORSMiddleware)
+	r.PathPrefix("/").Methods(http.MethodOptions).HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
-	r.Handle("/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetService))).Methods("GET")
-	r.Handle("/projects/{project_id}/services", s.SupabaseAuthMiddleware(http.HandlerFunc(s.GetServices))).Methods("GET")
-	r.Handle("/projects/{project_id}/services", s.SupabaseAuthMiddleware(http.HandlerFunc(s.CreateService))).Methods("POST")
+	r.Handle("/projects/{project_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetProject))).Methods("GET")
+	r.Handle("/projects", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetProjects))).Methods("GET")
+	r.Handle("/projects", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateProject))).Methods("POST")
+	r.Handle("/projects/{project_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateProject))).Methods("PUT")
+	r.Handle("/projects/{project_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteProject))).Methods("DELETE")
+
+	r.Handle("/services/{service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetService))).Methods("GET")
+	r.Handle("/projects/{project_id}/services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetServices))).Methods("GET")
+	r.Handle("/projects/{project_id}/services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateService))).Methods("POST")
 	r.Handle("/projects/{project_id}/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.UpdateService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/services/{service_id}", s.SupabaseAuthMiddleware(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
 

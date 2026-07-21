@@ -1,23 +1,20 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { SignIn } from "@clerk/clerk-react";
+import { safeRedirectTarget } from "@/lib/safe-redirect";
 
-export const Route = createFileRoute("/sign-in")({
-  beforeLoad: ({ context }) => {
-    if (context.auth.isSignedIn) {
-      throw redirect({ to: "/dashboard" });
-    }
-  },
+export const Route = createFileRoute("/sign-in/")({
   component: SignInPage,
 });
 
 function SignInPage() {
+  const { redirect } = Route.useSearch();
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <SignIn
         routing="path"
         path="/sign-in"
         signUpUrl="/sign-up"
-        forceRedirectUrl="/dashboard"
+        forceRedirectUrl={safeRedirectTarget(redirect)}
       />
     </div>
   );

@@ -32,7 +32,7 @@ export function Navbar() {
             >
               Dashboard
             </Link>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </SignedIn>
         </div>
       </nav>

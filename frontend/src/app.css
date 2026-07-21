@@ -13,9 +13,9 @@
     IDs, ports, domains, env vars all read like they came from a terminal,
     because on this product they basically did.
   - Body copy is IBM Plex Sans — quieter, built for paragraphs.
-  - One accent (violet) carries brand and interactive state. Status color
-    (green/amber/red) is reserved strictly for real infra state — never
-    decorative.
+  - One accent (red-600/700, carried over from the original htmx templates)
+    handles brand and interactive state. Green/amber are reserved strictly
+    for real infra state — never decorative.
 */
 
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
@@ -35,14 +35,14 @@
   --color-text-muted: #9a9aa4;
   --color-text-faint: #57575f;
 
-  --color-accent: #6e56cf;
-  --color-accent-hover: #7f68e0;
-  --color-accent-soft: #6e56cf1a;
+  --color-accent: #dc2626; /* red-600, from the original htmx templates */
+  --color-accent-hover: #b91c1c; /* red-700 */
+  --color-accent-soft: #dc26261a;
 
   --color-good: #35d68a;
   --color-good-soft: #35d68a1a;
-  --color-bad: #f0453c;
-  --color-bad-soft: #f0453c1a;
+  --color-bad: #dc2626; /* same red-600 — the original templates used one red for both brand and destructive actions */
+  --color-bad-soft: #dc26261a;
   --color-warn: #f2a93b;
   --color-warn-soft: #f2a93b1a;
 }

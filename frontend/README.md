@@ -49,6 +49,27 @@ src/
   app.css            design tokens + global styles
 ```
 
+## Clerk integration notes
+
+- `sign-in`/`sign-up` are directories, not single files: a `route.tsx`
+  layout (owns the auth guard + the `redirect` search param), an
+  `index.tsx` (bare `/sign-in`), and a `$.tsx` splat (`/sign-in/*`) that
+  catches Clerk's own sub-steps — `factor-one`, `reset-password`,
+  `sso-callback`, etc. Clerk reads the URL itself to know which step to
+  render, so the splat just needs to mount the same `<SignIn/>`.
+- The router only mounts inside `<ClerkLoaded>` (see `main.tsx`). Mounting
+  it earlier means `useAuth().isSignedIn` is briefly `false` while Clerk
+  is still checking the session, which sends a signed-in user to
+  `/sign-in`, which then bounces them right back — a redirect loop.
+- `ClerkProvider` gets `routerPush`/`routerReplace` wired to
+  `router.navigate` so Clerk's internal navigations use the SPA router
+  instead of falling back to full `window.location` reloads.
+- If `/dashboard` or `/projects/*` redirect you to sign-in, they pass
+  `?redirect=<original path>`; sign-in/sign-up read that back out
+  (`safeRedirectTarget` in `lib/safe-redirect.ts`, which also guards
+  against an open-redirect via a crafted `redirect` param) and send you
+  back there after auth instead of always landing on `/dashboard`.
+
 ## Known gaps / next steps
 
 This scaffold covers the SPA itself. Still open, per the implementation plan:

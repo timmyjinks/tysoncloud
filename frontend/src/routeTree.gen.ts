@@ -11,11 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
-import { Route as SignInRouteImport } from './routes/sign-in'
-import { Route as SignUpRouteImport } from './routes/sign-up'
+import { Route as SignInRouteRouteImport } from './routes/sign-in/route'
+import { Route as SignUpRouteRouteImport } from './routes/sign-up/route'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardNewRouteImport } from './routes/dashboard/new'
 import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$projectId/route'
+import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
+import { Route as SignInSplatRouteImport } from './routes/sign-in/$'
+import { Route as SignUpIndexRouteImport } from './routes/sign-up/index'
+import { Route as SignUpSplatRouteImport } from './routes/sign-up/$'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
 import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
 import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
@@ -34,12 +38,12 @@ const DashboardRouteRoute = DashboardRouteRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignInRoute = SignInRouteImport.update({
+const SignInRouteRoute = SignInRouteRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SignUpRoute = SignUpRouteImport.update({
+const SignUpRouteRoute = SignUpRouteRouteImport.update({
   id: '/sign-up',
   path: '/sign-up',
   getParentRoute: () => rootRouteImport,
@@ -58,6 +62,26 @@ const ProjectsProjectIdRouteRoute = ProjectsProjectIdRouteRouteImport.update({
   id: '/projects/$projectId',
   path: '/projects/$projectId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SignInIndexRoute = SignInIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SignInRouteRoute,
+} as any)
+const SignInSplatRoute = SignInSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => SignInRouteRoute,
+} as any)
+const SignUpIndexRoute = SignUpIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SignUpRouteRoute,
+} as any)
+const SignUpSplatRoute = SignUpSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
+  getParentRoute: () => SignUpRouteRoute,
 } as any)
 const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   id: '/',
@@ -104,11 +128,15 @@ const ProjectsProjectIdServicesServiceIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/sign-in': typeof SignInRouteRouteWithChildren
+  '/sign-up': typeof SignUpRouteRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/dashboard/new': typeof DashboardNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/sign-in/': typeof SignInIndexRoute
+  '/sign-up/': typeof SignUpIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -119,10 +147,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
   '/dashboard/new': typeof DashboardNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/sign-in': typeof SignInIndexRoute
+  '/sign-up': typeof SignUpIndexRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -135,11 +165,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
-  '/sign-in': typeof SignInRoute
-  '/sign-up': typeof SignUpRoute
+  '/sign-in': typeof SignInRouteRouteWithChildren
+  '/sign-up': typeof SignUpRouteRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/dashboard/new': typeof DashboardNewRoute
+  '/sign-in/$': typeof SignInSplatRoute
+  '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/sign-in/': typeof SignInIndexRoute
+  '/sign-up/': typeof SignUpIndexRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -157,7 +191,11 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/projects/$projectId'
     | '/dashboard/new'
+    | '/sign-in/$'
+    | '/sign-up/$'
     | '/dashboard/'
+    | '/sign-in/'
+    | '/sign-up/'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -168,10 +206,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dashboard/new'
+    | '/sign-in/$'
+    | '/sign-up/$'
+    | '/dashboard'
     | '/sign-in'
     | '/sign-up'
-    | '/dashboard/new'
-    | '/dashboard'
     | '/projects/$projectId'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -187,7 +227,11 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/projects/$projectId'
     | '/dashboard/new'
+    | '/sign-in/$'
+    | '/sign-up/$'
     | '/dashboard/'
+    | '/sign-in/'
+    | '/sign-up/'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -200,8 +244,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
-  SignInRoute: typeof SignInRoute
-  SignUpRoute: typeof SignUpRoute
+  SignInRouteRoute: typeof SignInRouteRouteWithChildren
+  SignUpRouteRoute: typeof SignUpRouteRouteWithChildren
   ProjectsProjectIdRouteRoute: typeof ProjectsProjectIdRouteRouteWithChildren
 }
 
@@ -225,14 +269,14 @@ declare module '@tanstack/react-router' {
       id: '/sign-in'
       path: '/sign-in'
       fullPath: '/sign-in'
-      preLoaderRoute: typeof SignInRouteImport
+      preLoaderRoute: typeof SignInRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sign-up': {
       id: '/sign-up'
       path: '/sign-up'
       fullPath: '/sign-up'
-      preLoaderRoute: typeof SignUpRouteImport
+      preLoaderRoute: typeof SignUpRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/': {
@@ -255,6 +299,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/projects/$projectId'
       preLoaderRoute: typeof ProjectsProjectIdRouteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/sign-in/': {
+      id: '/sign-in/'
+      path: '/'
+      fullPath: '/sign-in/'
+      preLoaderRoute: typeof SignInIndexRouteImport
+      parentRoute: typeof SignInRouteRoute
+    }
+    '/sign-in/$': {
+      id: '/sign-in/$'
+      path: '/$'
+      fullPath: '/sign-in/$'
+      preLoaderRoute: typeof SignInSplatRouteImport
+      parentRoute: typeof SignInRouteRoute
+    }
+    '/sign-up/': {
+      id: '/sign-up/'
+      path: '/'
+      fullPath: '/sign-up/'
+      preLoaderRoute: typeof SignUpIndexRouteImport
+      parentRoute: typeof SignUpRouteRoute
+    }
+    '/sign-up/$': {
+      id: '/sign-up/$'
+      path: '/$'
+      fullPath: '/sign-up/$'
+      preLoaderRoute: typeof SignUpSplatRouteImport
+      parentRoute: typeof SignUpRouteRoute
     }
     '/projects/$projectId/': {
       id: '/projects/$projectId/'
@@ -322,6 +394,34 @@ const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
   DashboardRouteRouteChildren,
 )
 
+interface SignInRouteRouteChildren {
+  SignInSplatRoute: typeof SignInSplatRoute
+  SignInIndexRoute: typeof SignInIndexRoute
+}
+
+const SignInRouteRouteChildren: SignInRouteRouteChildren = {
+  SignInSplatRoute: SignInSplatRoute,
+  SignInIndexRoute: SignInIndexRoute,
+}
+
+const SignInRouteRouteWithChildren = SignInRouteRoute._addFileChildren(
+  SignInRouteRouteChildren,
+)
+
+interface SignUpRouteRouteChildren {
+  SignUpSplatRoute: typeof SignUpSplatRoute
+  SignUpIndexRoute: typeof SignUpIndexRoute
+}
+
+const SignUpRouteRouteChildren: SignUpRouteRouteChildren = {
+  SignUpSplatRoute: SignUpSplatRoute,
+  SignUpIndexRoute: SignUpIndexRoute,
+}
+
+const SignUpRouteRouteWithChildren = SignUpRouteRoute._addFileChildren(
+  SignUpRouteRouteChildren,
+)
+
 interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
@@ -355,8 +455,8 @@ const ProjectsProjectIdRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
-  SignInRoute: SignInRoute,
-  SignUpRoute: SignUpRoute,
+  SignInRouteRoute: SignInRouteRouteWithChildren,
+  SignUpRouteRoute: SignUpRouteRouteWithChildren,
   ProjectsProjectIdRouteRoute: ProjectsProjectIdRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport

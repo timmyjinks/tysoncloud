@@ -9,6 +9,8 @@ type ResourceCardProps = {
   promptId: string;
   title: string;
   status?: string;
+  /** small glyph shown before the prompt line to distinguish resource kinds (service/database/etc) */
+  icon?: React.ReactNode;
   /** key/value pairs rendered as a small meta grid */
   meta: { label: string; value: string; mono?: boolean; href?: string }[];
   detailHref?: string;
@@ -19,6 +21,7 @@ export function ResourceCard({
   promptId,
   title,
   status,
+  icon,
   meta,
   detailHref,
   onDelete,
@@ -26,8 +29,9 @@ export function ResourceCard({
   return (
     <Card className="group overflow-hidden hover:border-[var(--color-border-strong)]">
       <div className="terminal-strip flex items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-2">
-        <span>
-          <span className="prompt">$</span> {promptId}
+        <span className="flex items-center gap-1.5">
+          {icon ?? <span className="prompt">$</span>}
+          {promptId}
         </span>
         {onDelete && (
           <button

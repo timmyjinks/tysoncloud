@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Navbar } from "@/components/navbar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: ({ context, location }) => {
@@ -12,9 +12,11 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardLayout() {
   return (
-    <div>
-      <Navbar />
-      <Outlet />
+    <div className="flex min-h-screen">
+      <AppSidebar />
+      <div className="min-w-0 flex-1">
+        <Outlet />
+      </div>
     </div>
   );
 }

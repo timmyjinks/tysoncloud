@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { Navbar } from "@/components/navbar";
+import { AppSidebar } from "@/components/app-sidebar";
 
 export const Route = createFileRoute("/projects/$projectId")({
   beforeLoad: ({ context, location }) => {
@@ -11,10 +11,13 @@ export const Route = createFileRoute("/projects/$projectId")({
 });
 
 function ProjectLayout() {
+  const { projectId } = Route.useParams();
   return (
-    <div>
-      <Navbar />
-      <Outlet />
+    <div className="flex min-h-screen">
+      <AppSidebar activeProjectId={projectId} />
+      <div className="min-w-0 flex-1">
+        <Outlet />
+      </div>
     </div>
   );
 }

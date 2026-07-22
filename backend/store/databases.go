@@ -9,19 +9,25 @@ import (
 )
 
 type DatabasesTable struct {
-	Id            string    `json:"id,omitempty"`
-	ProjectId     string    `json:"project_id,omitempty"`
-	Name          string    `json:"name,omitempty"`
-	Engine        string    `json:"engine,omitempty"`
-	ResourceName  string    `json:"resource_name,omitempty"`
-	PrivateDomain string    `json:"private_domain,omitempty"`
-	Port          int32     `json:"port,omitempty"`
-	StorageGB     int32     `json:"storage,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	Id             string    `json:"id"`
+	ProjectId      string    `json:"project_id"`
+	Name           string    `json:"name"`
+	Engine         string    `json:"engine"`
+	ResourceName   string    `json:"resource_name"`
+	InternalDomain string    `json:"internal_domain"`
+	Port           int32     `json:"port"`
+	StorageGB      int32     `json:"storage"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
-func (s *SupabaseStore) GetDatabase(projectId, userId string) (DatabasesTable, error) {
-	res, _, err := s.cli.From("databases").Select("*", "exact", false).Eq("project_id", projectId).Eq("user_id", userId).Order("created_at", &postgrest.OrderOpts{Ascending: false}).Single().Execute()
+func (s *SupabaseStore) GetDatabase(id, userId string) (DatabasesTable, error) {
+	res, _, err := s.cli.From("databases").
+		Select("*, projects!inner(user_id)", "exact", false).
+		Eq("id", id).
+		Eq("projects.user_id", userId).
+		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Single().
+		Execute()
 	if err != nil {
 		return DatabasesTable{}, err
 	}
@@ -35,7 +41,13 @@ func (s *SupabaseStore) GetDatabase(projectId, userId string) (DatabasesTable, e
 }
 
 func (s *SupabaseStore) GetDatabases(projectId, userId string) ([]DatabasesTable, error) {
-	res, _, err := s.cli.From("databases").Select("*", "exact", false).Eq("project_id", projectId).Eq("user_id", userId).Order("created_at", &postgrest.OrderOpts{Ascending: false}).Execute()
+	res, _, err := s.cli.From("databases").
+		Select("*, projects!inner(user_id)", "exact", false).
+		Eq("project_id", projectId).
+		Eq("projects.user_id", userId).
+		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Execute()
+
 	if err != nil {
 		return nil, err
 	}

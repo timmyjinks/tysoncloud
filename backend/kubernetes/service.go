@@ -26,8 +26,15 @@ func (d *KubernetesService) CreateService(ctx context.Context, resource Resource
 		Spec: &appcorev1.ServiceSpecApplyConfiguration{
 			Ports: []appcorev1.ServicePortApplyConfiguration{
 				{
+					Name:       util.StringPtr("service"),
 					Protocol:   (*corev1.Protocol)(util.StringPtr(string(corev1.ProtocolTCP))),
-					Port:       util.IntPtr(resource.Port),
+					Port:       &resource.Port,
+					TargetPort: &intstr.IntOrString{IntVal: resource.Port},
+				},
+				{
+					Name:       util.StringPtr("entrypoint"),
+					Protocol:   (*corev1.Protocol)(util.StringPtr(string(corev1.ProtocolTCP))),
+					Port:       util.IntPtr(80),
 					TargetPort: &intstr.IntOrString{IntVal: resource.Port},
 				},
 			},

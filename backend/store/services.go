@@ -106,7 +106,7 @@ func (s *SupabaseStore) UpdateService(id, userId, name, image string, port int32
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
-		return ServicesTable{}, fmt.Errorf("create_service failed: %s", pgErr.Message)
+		return ServicesTable{}, fmt.Errorf("update_service failed: %s", pgErr.Message)
 	}
 
 	return res, nil
@@ -120,7 +120,7 @@ func (s *SupabaseStore) DeleteService(id, userId string) error {
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
-		return fmt.Errorf("create_service failed: %s", pgErr.Message)
+		return fmt.Errorf("delete_service failed: %s", pgErr.Message)
 	}
 
 	return nil

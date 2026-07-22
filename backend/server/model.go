@@ -61,6 +61,7 @@ type ServiceCreateRequest struct {
 	Name  string `json:"name"`
 	Image string `json:"image"`
 	Port  int32  `json:"port"`
+	Env   string `json:"env"`
 }
 
 type ServiceCreateResponse struct {
@@ -71,6 +72,7 @@ type ServiceUpdateRequest struct {
 	Name  *string `json:"name,omitempty"`
 	Image *string `json:"image,omitempty"`
 	Port  *int32  `json:"port,omitempty"`
+	Env   *string `json:"env"`
 }
 
 type ServiceDeleteRequest struct {
@@ -92,3 +94,4 @@ type ProjectUpdateRequest struct {
 
 var emptyName error = errors.New("name was empty")
 var emptyImage error = errors.New("image was empty")
+var invalidEnv error = errors.New("env was not valid KEY=VALUE lines")

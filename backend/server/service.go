@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 var invalidServiceId error = errors.New("service with id not found")
@@ -89,6 +90,11 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ok, err := util.ValidateEnv(service.Env); err != nil || !ok {
+		http.Error(w, invalidEnv.Error(), http.StatusBadRequest)
+		return
+	}
+
 	claims, ok := clerk.SessionClaimsFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusBadRequest)
@@ -107,7 +113,7 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,
 		Hostname:  res.PublicDomain,
-		Env:       map[string][]byte{},
+		Env:       util.ParseEnv(service.Env),
 		Image:     service.Image,
 		Port:      service.Port,
 	}); err != nil {
@@ -148,6 +154,15 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var env string
+	if service.Env != nil {
+		if ok, err := util.ValidateEnv(*service.Env); err != nil || !ok {
+			http.Error(w, invalidEnv.Error(), http.StatusBadRequest)
+			return
+		}
+		env = *service.Env
+	}
+
 	claims, ok := clerk.SessionClaimsFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusBadRequest)
@@ -181,14 +196,13 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,
 		Hostname:  res.PublicDomain,
-		Env:       map[string][]byte{},
+		Env:       util.ParseEnv(env),
 		Image:     *service.Image,
 		Port:      *service.Port,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
-
 }
 
 func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {

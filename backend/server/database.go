@@ -39,13 +39,14 @@ func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(DatabaseResponse{
-		Id:        database.Id,
-		ProjectId: database.ProjectId,
-		Name:      database.Name,
-		Engine:    database.Engine,
-		Port:      database.Port,
-		Storage:   database.StorageGB,
-		CreatedAt: database.CreatedAt,
+		Id:             database.Id,
+		ProjectId:      database.ProjectId,
+		Name:           database.Name,
+		Engine:         database.Engine,
+		Port:           database.Port,
+		Storage:        database.StorageGB,
+		InternalDomain: database.InternalDomain,
+		CreatedAt:      database.CreatedAt,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -224,13 +225,14 @@ func ToDatabasesResponse(databasesTable []store.DatabasesTable) []DatabaseRespon
 	var databases []DatabaseResponse = []DatabaseResponse{}
 	for _, database := range databasesTable {
 		databases = append(databases, DatabaseResponse{
-			Id:        database.Id,
-			ProjectId: database.ProjectId,
-			Name:      database.Name,
-			Engine:    database.Engine,
-			Port:      database.Port,
-			Storage:   database.StorageGB,
-			CreatedAt: database.CreatedAt,
+			Id:             database.Id,
+			ProjectId:      database.ProjectId,
+			Name:           database.Name,
+			Engine:         database.Engine,
+			Port:           database.Port,
+			Storage:        database.StorageGB,
+			InternalDomain: database.InternalDomain,
+			CreatedAt:      database.CreatedAt,
 		})
 	}
 	return databases

@@ -2,6 +2,7 @@ package util
 
 import (
 	"regexp"
+	"strings"
 )
 
 var nameRegex = regexp.MustCompile(`^[A-Za-z-]+$`)
@@ -15,10 +16,30 @@ func validateName(name string) (bool, error) {
 	return nameRegex.MatchString(name), nil
 }
 
-func validateEnv(env string) (bool, error) {
+func ValidateEnv(env string) (bool, error) {
 	if env == "" {
 		return true, nil
 	}
 
 	return envRegex.MatchString(env), nil
+}
+
+func ParseEnv(env string) map[string][]byte {
+	result := map[string][]byte{}
+
+	for _, line := range strings.Split(env, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		result[parts[0]] = []byte(parts[1])
+	}
+
+	return result
 }

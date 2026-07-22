@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/deploy"
 )
@@ -48,19 +49,15 @@ func (app *Application) CreateVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	if _, err := app.Supabase.CreateVolume(serviceId, user.ID.String(), service.MountPath, service.StorageGB); err != nil {
+	if _, err := app.Supabase.CreateVolume(serviceId, userId, service.MountPath, service.StorageGB); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -92,19 +89,15 @@ func (app *Application) DeleteVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	if err := app.Supabase.DeleteVolume(serviceId, user.ID.String()); err != nil {
+	if err := app.Supabase.DeleteVolume(serviceId, userId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

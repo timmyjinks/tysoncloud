@@ -148,17 +148,13 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
 	if service.Name == nil {
 		http.Error(w, emptyName.Error(), http.StatusBadRequest)
@@ -175,7 +171,7 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := app.Supabase.UpdateService(serviceId, user.ID.String(), *service.Name, *service.Image, *service.Port)
+	res, err := app.Supabase.UpdateService(serviceId, userId, *service.Name, *service.Image, *service.Port)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -208,19 +204,15 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	if err := app.Supabase.DeleteService(serviceId, user.ID.String()); err != nil {
+	if err := app.Supabase.DeleteService(serviceId, userId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -232,15 +224,15 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := app.Cloudflare.DeleteRecord(r.Context(), "tc-"+serviceId); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if err := app.Cloudflare.DeleteRoute(r.Context(), "tc-"+serviceId); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	// if err := app.Cloudflare.DeleteRecord(r.Context(), "tc-"+serviceId); err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+	//
+	// if err := app.Cloudflare.DeleteRoute(r.Context(), "tc-"+serviceId); err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	w.WriteHeader(204)
 }

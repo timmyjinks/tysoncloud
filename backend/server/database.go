@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
@@ -22,19 +23,15 @@ func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	database, err := app.Supabase.GetDatabase(dataseId, user.ID.String())
+	database, err := app.Supabase.GetDatabase(dataseId, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -62,19 +59,15 @@ func (app *Application) GetDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	services, err := app.Supabase.GetDatabases(projectId, user.ID.String())
+	services, err := app.Supabase.GetDatabases(projectId, userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,19 +96,15 @@ func (app *Application) CreateDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	res, err := app.Supabase.CreateDatabase(user.ID.String(), projectId, service.Name, service.Engine, port, service.StorageGB)
+	res, err := app.Supabase.CreateDatabase(userId, projectId, service.Name, service.Engine, port, service.StorageGB)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -154,17 +143,13 @@ func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
 	if service.Name == nil {
 		http.Error(w, emptyName.Error(), http.StatusBadRequest)
@@ -181,7 +166,7 @@ func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := app.Supabase.UpdateDatabase(databaseId, user.ID.String(), *service.Name, *service.StorageGB)
+	res, err := app.Supabase.UpdateDatabase(databaseId, userId, *service.Name, *service.StorageGB)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -212,19 +197,15 @@ func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := ClientFromContext(r.Context())
-	if client == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		return
 	}
 
-	user, err := client.Auth.GetUser()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
+	userId := claims.Subject
 
-	if err := app.Supabase.DeleteDatabase(databaseId, user.ID.String()); err != nil {
+	if err := app.Supabase.DeleteDatabase(databaseId, userId); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

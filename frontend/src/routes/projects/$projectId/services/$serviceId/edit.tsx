@@ -4,6 +4,7 @@ import { useService, useUpdateService } from "@/lib/api/services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/projects/$projectId/services/$serviceId/edit")({
   component: EditServicePage,
@@ -18,6 +19,7 @@ function EditServicePage() {
   const [name, setName] = useState("");
   const [image, setImage] = useState("");
   const [port, setPort] = useState("");
+  const [env, setEnv] = useState("");
 
   useEffect(() => {
     if (!service) return;
@@ -42,7 +44,7 @@ function EditServicePage() {
         onSubmit={(e) => {
           e.preventDefault();
           updateService.mutate(
-            { name, image, port: Number(port) },
+            { name, image, port: Number(port), env },
             {
               onSuccess: () =>
                 navigate({
@@ -79,6 +81,22 @@ function EditServicePage() {
             onChange={(e) => setPort(e.target.value)}
             className="mt-2 font-mono"
           />
+        </div>
+
+        <div>
+          <Label htmlFor="env">Environment variables</Label>
+          <Textarea
+            id="env"
+            value={env}
+            onChange={(e) => setEnv(e.target.value)}
+            placeholder={"KEY=value\nANOTHER_KEY=value"}
+            rows={5}
+            className="mt-2"
+          />
+          <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+            One <code>KEY=value</code> pair per line. Existing values aren't shown here for
+            security — leave blank to keep them unchanged, or re-enter to replace them.
+          </p>
         </div>
 
         {updateService.error && (

@@ -1,3 +1,5 @@
+// Mirrors backend/server/model.go response/request shapes.
+
 export type Project = {
   id: string;
   name: string;
@@ -19,7 +21,7 @@ export type Service = {
   port: number;
   status: string;
   public_domain: string;
-  private_domain: string;
+  private_domain: string; // conceptually "internal_domain"
   created_at: string;
 };
 
@@ -27,14 +29,12 @@ export type ServiceCreateRequest = {
   name: string;
   image: string;
   port: number;
-  env?: string;
 };
 
 export type ServiceUpdateRequest = {
   name?: string;
   image?: string;
   port?: number;
-  env?: string;
 };
 
 export type Database = {

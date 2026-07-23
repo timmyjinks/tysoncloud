@@ -35,14 +35,14 @@
   --color-text-muted: #9a9aa4;
   --color-text-faint: #57575f;
 
-  --color-accent: #dc2626; /* red-600, from the original htmx templates */
-  --color-accent-hover: #b91c1c; /* red-700 */
-  --color-accent-soft: #dc26261a;
+  --color-accent: #ff4433; /* warmer, more saturated than red-600 — more presence on near-black */
+  --color-accent-hover: #e23a2c;
+  --color-accent-soft: #ff44331a;
 
   --color-good: #35d68a;
   --color-good-soft: #35d68a1a;
-  --color-bad: #dc2626; /* same red-600 — the original templates used one red for both brand and destructive actions */
-  --color-bad-soft: #dc26261a;
+  --color-bad: #ff4433; /* same accent red — one red for both brand and destructive actions */
+  --color-bad-soft: #ff44331a;
   --color-warn: #f2a93b;
   --color-warn-soft: #f2a93b1a;
 }
@@ -66,21 +66,6 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
-}
-
-/* Signature element: the "terminal strip" — a monospace status line used
-   at the top of every resource card, styled like a shell prompt. It's the
-   one recurring motif that ties the dashboard back to the thing it manages:
-   containers, ports, processes. */
-.terminal-strip {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: -0.01em;
-  color: var(--color-text-faint);
-}
-
-.terminal-strip .prompt {
-  color: var(--color-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {

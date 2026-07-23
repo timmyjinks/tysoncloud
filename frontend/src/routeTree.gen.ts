@@ -21,6 +21,7 @@ import { Route as SignInSplatRouteImport } from './routes/sign-in/$'
 import { Route as SignUpIndexRouteImport } from './routes/sign-up/index'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up/$'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdEditRouteImport } from './routes/projects/$projectId/edit'
 import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
 import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
 import { Route as ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport } from './routes/projects/$projectId/databases/$databaseId/index'
@@ -88,6 +89,11 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRouteRoute,
 } as any)
+const ProjectsProjectIdEditRoute = ProjectsProjectIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => ProjectsProjectIdRouteRoute,
+} as any)
 const ProjectsProjectIdDatabasesNewRoute =
   ProjectsProjectIdDatabasesNewRouteImport.update({
     id: '/databases/new',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/sign-up/': typeof SignUpIndexRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/sign-in': typeof SignInIndexRoute
   '/sign-up': typeof SignUpIndexRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/sign-up/': typeof SignUpIndexRoute
+  '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/sign-in/'
     | '/sign-up/'
+    | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/sign-in'
     | '/sign-up'
+    | '/projects/$projectId/edit'
     | '/projects/$projectId'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/sign-in/'
     | '/sign-up/'
+    | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/services/new'
@@ -335,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/edit': {
+      id: '/projects/$projectId/edit'
+      path: '/edit'
+      fullPath: '/projects/$projectId/edit'
+      preLoaderRoute: typeof ProjectsProjectIdEditRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/databases/new': {
       id: '/projects/$projectId/databases/new'
       path: '/databases/new'
@@ -423,6 +442,7 @@ const SignUpRouteRouteWithChildren = SignUpRouteRoute._addFileChildren(
 )
 
 interface ProjectsProjectIdRouteRouteChildren {
+  ProjectsProjectIdEditRoute: typeof ProjectsProjectIdEditRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
   ProjectsProjectIdServicesNewRoute: typeof ProjectsProjectIdServicesNewRoute
@@ -434,6 +454,7 @@ interface ProjectsProjectIdRouteRouteChildren {
 
 const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
   {
+    ProjectsProjectIdEditRoute: ProjectsProjectIdEditRoute,
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
     ProjectsProjectIdDatabasesNewRoute: ProjectsProjectIdDatabasesNewRoute,
     ProjectsProjectIdServicesNewRoute: ProjectsProjectIdServicesNewRoute,

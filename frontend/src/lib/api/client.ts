@@ -54,8 +54,12 @@ async function request<T>(
     );
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  // Several endpoints (CreateService, CreateProject, CreateDatabase, CreateVolume,
+  // and the Update* handlers) return a success status with no response body at all —
+  // not just 204. Read as text first so an empty body never hits JSON.parse.
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 export const api = {

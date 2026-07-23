@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useDeleteProject, useProjects } from "@/lib/api/projects";
-import { ResourceCard } from "@/components/resource-card";
+import { ProjectRow } from "@/components/project-row";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { Button } from "@/components/ui/button";
 import type { Project } from "@/lib/api/types";
@@ -16,11 +16,11 @@ function DashboardIndex() {
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="font-mono text-2xl font-bold">Projects</h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <h1 className="font-mono text-3xl font-bold">Projects</h1>
+          <p className="text-base text-[var(--color-text-muted)]">
             Everything you're running on TYSONCLOUD
           </p>
         </div>
@@ -51,18 +51,19 @@ function DashboardIndex() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {projects?.map((project) => (
-          <ResourceCard
-            key={project.id}
-            promptId={`cd ${project.name}`}
-            title={project.name}
-            meta={[{ label: "id", value: project.id, mono: true }]}
-            detailHref={`/projects/${project.id}`}
-            onDelete={() => setPendingDelete(project)}
-          />
-        ))}
-      </div>
+      {projects && projects.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+          {projects.map((project) => (
+            <ProjectRow
+              key={project.id}
+              name={project.name}
+              id={project.id}
+              href={`/projects/${project.id}`}
+              onDelete={() => setPendingDelete(project)}
+            />
+          ))}
+        </div>
+      )}
 
       <DeleteConfirmDialog
         open={!!pendingDelete}

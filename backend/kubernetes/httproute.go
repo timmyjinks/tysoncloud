@@ -47,7 +47,7 @@ func (svc *KubernetesService) CreateHTTPRoute(ctx context.Context, resource Reso
 							BackendRefApplyConfiguration: v1.BackendRefApplyConfiguration{
 								BackendObjectReferenceApplyConfiguration: v1.BackendObjectReferenceApplyConfiguration{
 									Name: (*gatewayv1.ObjectName)(util.StringPtr(resource.Name)),
-									Port: util.IntPtr(80),
+									Port: util.IntPtr(resource.Port),
 								},
 							},
 						},

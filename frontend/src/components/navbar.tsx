@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
+import { SignedIn, SignedOut } from "@clerk/clerk-react";
 
 export function Navbar() {
   return (
@@ -28,11 +28,10 @@ export function Navbar() {
           <SignedIn>
             <Link
               to="/dashboard"
-              className="text-sm text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+              className="rounded-md bg-[var(--color-accent)] px-3 py-1 text-base font-medium text-white hover:bg-[var(--color-accent-hover)]"
             >
               Dashboard
             </Link>
-            <UserButton />
           </SignedIn>
         </div>
       </nav>

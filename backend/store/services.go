@@ -112,6 +112,26 @@ func (s *SupabaseStore) UpdateService(id, userId, name, image string, port int32
 	return res, nil
 }
 
+func (s *SupabaseStore) UpdateServiceStatus(id, userId, status string) (ServicesTable, error) {
+	result := s.cli.Rpc("update_service_status", "", map[string]interface{}{
+		"p_id":      id,
+		"p_user_id": userId,
+		"p_status":  status,
+	})
+
+	var res ServicesTable
+	if err := json.Unmarshal([]byte(result), &res); err != nil {
+		return ServicesTable{}, err
+	}
+
+	var pgErr PostgrestError
+	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		return ServicesTable{}, fmt.Errorf("update_service_status failed: %s", pgErr.Message)
+	}
+
+	return res, nil
+}
+
 func (s *SupabaseStore) DeleteService(id, userId string) error {
 	result := s.cli.Rpc("delete_service", "", map[string]interface{}{
 		"p_id":      id,

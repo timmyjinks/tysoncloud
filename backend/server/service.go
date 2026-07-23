@@ -118,6 +118,10 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		Port:      service.Port,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		if _, err := app.Supabase.UpdateServiceStatus(res.Id, userId, "failed"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		return
 	}
 
@@ -130,6 +134,11 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
 	// 	return
 	// }
+
+	if _, err := app.Supabase.UpdateServiceStatus(res.Id, userId, "running"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusCreated)
 }
@@ -201,6 +210,15 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		Port:      *service.Port,
 	}); err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		if _, err := app.Supabase.UpdateServiceStatus(res.Id, userId, "failed"); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	if _, err := app.Supabase.UpdateServiceStatus(res.Id, userId, "running"); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }

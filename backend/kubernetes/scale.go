@@ -25,7 +25,7 @@ func (d *KubernetesService) CreateHPA(ctx context.Context, resource Resource) er
 		},
 		Spec: &v2.HorizontalPodAutoscalerSpecApplyConfiguration{
 			ScaleTargetRef: &v2.CrossVersionObjectReferenceApplyConfiguration{
-				Kind:       util.StringPtr("Resource"),
+				Kind:       util.StringPtr("Deployment"),
 				APIVersion: util.StringPtr("apps/v1"),
 				Name:       &resource.Name,
 			},

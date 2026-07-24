@@ -1,0 +1,23 @@
+import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { AppSidebar } from "@/components/app-sidebar";
+
+export const Route = createFileRoute("/projects/$projectId")({
+  beforeLoad: ({ context, location }) => {
+    if (!context.auth.isSignedIn) {
+      throw redirect({ to: "/sign-in", search: { redirect: location.href } });
+    }
+  },
+  component: ProjectLayout,
+});
+
+function ProjectLayout() {
+  const { projectId } = Route.useParams();
+  return (
+    <div className="flex min-h-screen">
+      <AppSidebar activeProjectId={projectId} />
+      <div className="min-w-0 flex-1">
+        <Outlet />
+      </div>
+    </div>
+  );
+}

@@ -14,6 +14,23 @@ func (d *DeployService) DeleteDatabaseEnv(ctx context.Context, database Database
 	})
 }
 
+func (d *DeployService) BatchCreateDatabases(ctx context.Context, databases []Database) error {
+	for _, database := range databases {
+		switch database.Engine {
+		case "postgres":
+			return d.svc.CreatePostgresDatabase(ctx, kubernetes.Resource{
+				Namespace: database.Namespace,
+				Name:      database.Name,
+				Engine:    database.Engine,
+				StorageGB: database.StorageGB,
+			})
+		default:
+			return errors.New("DB engine not found")
+		}
+	}
+	return nil
+}
+
 func (d *DeployService) CreateDatabase(ctx context.Context, database Database) error {
 	switch database.Engine {
 	case "postgres":

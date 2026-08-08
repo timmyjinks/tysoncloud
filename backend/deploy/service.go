@@ -40,6 +40,38 @@ func (d *DeployService) CreateService(ctx context.Context, service Service) erro
 	return nil
 }
 
+func (d *DeployService) BatchCreateServices(ctx context.Context, services []Service) error {
+	for _, service := range services {
+		if err := d.svc.CreateService(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
+
+		if len(service.Env) != 0 {
+			if err := d.svc.CreateSecret(ctx, ServiceToResource(service)); err != nil {
+				return err
+			}
+		} else {
+			if err := d.svc.DeleteSecret(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
+		}
+
+		if err := d.svc.CreateDeployment(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
+
+		if err := d.svc.CreateHPA(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
+
+		if err := d.svc.CreateHTTPRoute(ctx, ServiceToResource(service)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (d *DeployService) GetServiceEnv(ctx context.Context, service Service) (map[string]string, error) {
 	return d.svc.GetSecret(ctx, ServiceToResource(service))
 }

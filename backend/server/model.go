@@ -92,3 +92,30 @@ type ProjectCreateRequest struct {
 type ProjectUpdateRequest struct {
 	Name *string `json:"name,omitempty"`
 }
+
+type ProjectConfigRequest struct {
+	Content string `json:"content"`
+}
+
+type Services struct {
+	Name   string `toml:"name"`
+	Image  string `toml:"image"`
+	Port   int    `toml:"port"`
+	Volume *Volume
+}
+
+type Databases struct {
+	Name      string `toml:"name"`
+	Engine    string `toml:"engine"`
+	StorageGB int    `toml:"storage_gb"`
+}
+
+type Volume struct {
+	MountPath string `toml:"mount_path"`
+	StorageGB int    `toml:"storage_gb"`
+}
+
+type Config struct {
+	Services  []Services  `toml:"services"`
+	Databases []Databases `toml:"databases"`
+}

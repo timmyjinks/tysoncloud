@@ -37,5 +37,7 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/databases/{database_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateDatabase))).Methods("PUT")
 	r.Handle("/projects/{project_id}/databases/{database_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteDatabase))).Methods("DELETE")
 
+	r.Handle("/projects/{project_id}/config", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.ConfigProject))).Methods("POST")
+
 	return nil
 }

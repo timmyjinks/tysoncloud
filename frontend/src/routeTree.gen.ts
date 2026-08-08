@@ -21,6 +21,7 @@ import { Route as SignInSplatRouteImport } from './routes/sign-in/$'
 import { Route as SignUpIndexRouteImport } from './routes/sign-up/index'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up/$'
 import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$projectId/index'
+import { Route as ProjectsProjectIdConfigRouteImport } from './routes/projects/$projectId/config'
 import { Route as ProjectsProjectIdEditRouteImport } from './routes/projects/$projectId/edit'
 import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
 import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
@@ -89,6 +90,11 @@ const ProjectsProjectIdIndexRoute = ProjectsProjectIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProjectsProjectIdRouteRoute,
 } as any)
+const ProjectsProjectIdConfigRoute = ProjectsProjectIdConfigRouteImport.update({
+  id: '/config',
+  path: '/config',
+  getParentRoute: () => ProjectsProjectIdRouteRoute,
+} as any)
 const ProjectsProjectIdEditRoute = ProjectsProjectIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -143,6 +149,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/sign-up/': typeof SignUpIndexRoute
+  '/projects/$projectId/config': typeof ProjectsProjectIdConfigRoute
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
@@ -160,6 +167,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/sign-in': typeof SignInIndexRoute
   '/sign-up': typeof SignUpIndexRoute
+  '/projects/$projectId/config': typeof ProjectsProjectIdConfigRoute
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
@@ -182,6 +190,7 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/sign-in/': typeof SignInIndexRoute
   '/sign-up/': typeof SignUpIndexRoute
+  '/projects/$projectId/config': typeof ProjectsProjectIdConfigRoute
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
@@ -205,6 +214,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/sign-in/'
     | '/sign-up/'
+    | '/projects/$projectId/config'
     | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/sign-in'
     | '/sign-up'
+    | '/projects/$projectId/config'
     | '/projects/$projectId/edit'
     | '/projects/$projectId'
     | '/projects/$projectId/databases/new'
@@ -243,6 +254,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/sign-in/'
     | '/sign-up/'
+    | '/projects/$projectId/config'
     | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
@@ -347,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdIndexRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/config': {
+      id: '/projects/$projectId/config'
+      path: '/config'
+      fullPath: '/projects/$projectId/config'
+      preLoaderRoute: typeof ProjectsProjectIdConfigRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/edit': {
       id: '/projects/$projectId/edit'
       path: '/edit'
@@ -442,6 +461,7 @@ const SignUpRouteRouteWithChildren = SignUpRouteRoute._addFileChildren(
 )
 
 interface ProjectsProjectIdRouteRouteChildren {
+  ProjectsProjectIdConfigRoute: typeof ProjectsProjectIdConfigRoute
   ProjectsProjectIdEditRoute: typeof ProjectsProjectIdEditRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
@@ -454,6 +474,7 @@ interface ProjectsProjectIdRouteRouteChildren {
 
 const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
   {
+    ProjectsProjectIdConfigRoute: ProjectsProjectIdConfigRoute,
     ProjectsProjectIdEditRoute: ProjectsProjectIdEditRoute,
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
     ProjectsProjectIdDatabasesNewRoute: ProjectsProjectIdDatabasesNewRoute,

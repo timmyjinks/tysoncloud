@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Database as DatabaseIcon, Pencil, Plus, Server } from "lucide-react";
+import { Database as DatabaseIcon, FileCode, Pencil, Plus, Server } from "lucide-react";
 import { useProject } from "@/lib/api/projects";
 import { useDeleteService, useServices } from "@/lib/api/services";
 import { useDatabases, useDeleteDatabase } from "@/lib/api/databases";
@@ -52,6 +52,14 @@ function ProjectDetail() {
           className="text-[var(--color-text-faint)] hover:text-[var(--color-accent)]"
         >
           <Pencil className="h-4 w-4" />
+        </Link>
+        <Link
+          to="/projects/$projectId/config"
+          params={{ projectId }}
+          aria-label="Apply project config"
+          className="text-[var(--color-text-faint)] hover:text-[var(--color-accent)]"
+        >
+          <FileCode className="h-4 w-4" />
         </Link>
       </div>
       <p className="mt-1 text-base text-[var(--color-text-muted)]">

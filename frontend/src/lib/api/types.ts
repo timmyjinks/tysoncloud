@@ -78,4 +78,9 @@ export type VolumeCreateRequest = {
 export type ApiError = {
   error?: string;
   message?: string;
+  issues?: { line?: number; message: string }[];
+};
+
+export type ProjectConfigApplyRequest = {
+  content: string;
 };

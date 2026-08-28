@@ -16,10 +16,11 @@ type Config struct {
 }
 
 type Server struct {
-	Addr           string `env:"ADDR"`
-	AllowedOrigins string `env:"ALLOWED_ORIGINS"`
-	ClerkApiKey    string `env:"CLERK_API_KEY"`
-	ClusterIp      string `env:"CLUSTER_IP"`
+	Addr                string `env:"ADDR"`
+	AllowedOrigins      string `env:"ALLOWED_ORIGINS"`
+	ClerkApiKey         string `env:"CLERK_API_KEY"`
+	ClusterIp           string `env:"CLUSTER_IP"`
+	GithubWebhookSecret string `env:"GITHUB_WEBHOOK_SECRET"`
 }
 
 type Supabase struct {
@@ -35,10 +36,11 @@ func Load() (Config, error) {
 
 	return Config{
 		Server: Server{
-			Addr:           getString("ADDR", ":8080"),
-			AllowedOrigins: getString("ALLOWED_ORIGINS", "http://localhost:3000"),
-			ClerkApiKey:    getStringOrDie("CLERK_API_KEY"),
-			ClusterIp:      getString("CLUSTER_IP", "192.168.0.18"),
+			Addr:                getString("ADDR", ":8080"),
+			AllowedOrigins:      getString("ALLOWED_ORIGINS", "http://localhost:3000"),
+			ClerkApiKey:         getStringOrDie("CLERK_API_KEY"),
+			ClusterIp:           getString("CLUSTER_IP", "192.168.0.18"),
+			GithubWebhookSecret: getString("GITHUB_WEBHOOK_SECRET", ""),
 		},
 		Supabase: Supabase{
 			ProjectURL: getStringOrDie("SUPABASE_URL"),

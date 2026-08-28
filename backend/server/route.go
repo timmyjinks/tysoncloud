@@ -50,6 +50,12 @@ func (s *Application) registerRoutes(
 
 	r.Handle("/github/installations/{installation_id}/repositories", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GithubRepos))).Methods("GET")
 
+	r.Handle("/github/connections", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubConnections))).Methods("GET")
+	r.Handle("/github/connections", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateGithubConnection))).Methods("POST")
+	r.Handle("/github/connections/{connection_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubConnection))).Methods("DELETE")
+
+	r.Handle("/github/app", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubApp))).Methods("GET")
+
 	r.HandleFunc("/webhooks/github", s.GithubWebhook).Methods("POST")
 
 	return nil

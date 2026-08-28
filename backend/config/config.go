@@ -21,6 +21,7 @@ type Server struct {
 	ClerkApiKey         string `env:"CLERK_API_KEY"`
 	ClusterIp           string `env:"CLUSTER_IP"`
 	GithubWebhookSecret string `env:"GITHUB_WEBHOOK_SECRET"`
+	GithubAppSlug       string `env:"GITHUB_APP_SLUG"`
 }
 
 type Supabase struct {
@@ -41,6 +42,7 @@ func Load() (Config, error) {
 			ClerkApiKey:         getStringOrDie("CLERK_API_KEY"),
 			ClusterIp:           getString("CLUSTER_IP", "192.168.0.18"),
 			GithubWebhookSecret: getString("GITHUB_WEBHOOK_SECRET", ""),
+			GithubAppSlug:       getString("GITHUB_APP_SLUG", ""),
 		},
 		Supabase: Supabase{
 			ProjectURL: getStringOrDie("SUPABASE_URL"),

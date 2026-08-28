@@ -177,13 +177,22 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				builtImage = imageTag
 			}
 
+			// Preserve existing env on webhook redeploys (stored as k8s Secret).
+			existingEnvStr, _ := app.Deploy.GetServiceEnv(r.Context(), deploy.Service{
+				Namespace: "proj-" + svc.ProjectId,
+				Name:      svc.ResourceName,
+			})
+			existingEnv := map[string][]byte{}
+			for k, v := range existingEnvStr {
+				existingEnv[k] = []byte(v)
+			}
 			if err := app.Deploy.CreateService(r.Context(), deploy.Service{
 				Namespace: "proj-" + svc.ProjectId,
 				Name:      svc.ResourceName,
 				Hostname:  svc.PublicDomain,
 				Port:      svc.Port,
 				Image:     builtImage,
-				Env:       map[string][]byte{}, // env is stored as secret; preserve by not overwriting? For webhook, fetch existing env
+				Env:       existingEnv,
 			}); err != nil {
 				slog.Error("webhook: deploy failed", "service_id", svc.Id, "err", err)
 				if _, statusErr := app.Supabase.UpdateGithubServiceStatusById(svc.Id, "failed"); statusErr != nil {

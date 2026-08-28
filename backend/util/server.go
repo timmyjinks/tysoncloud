@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -67,4 +68,28 @@ func ParseEnv(env string) map[string][]byte {
 	}
 
 	return result
+}
+
+func SanitizeRootDir(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return ".", nil
+	}
+	clean := strings.ReplaceAll(v, "\\", "/")
+	// Prevent traversal
+	if strings.HasPrefix(clean, "/") {
+		return "", fmt.Errorf("root_dir must be relative, got %q", raw)
+	}
+	parts := strings.Split(clean, "/")
+	for _, p := range parts {
+		if p == ".." {
+			return "", fmt.Errorf("root_dir must not contain '..', got %q", raw)
+		}
+	}
+	// normalize ./ and trailing /
+	out := strings.Join(parts, "/")
+	if out == "" || out == "." {
+		return ".", nil
+	}
+	return out, nil
 }

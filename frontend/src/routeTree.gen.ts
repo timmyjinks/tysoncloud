@@ -15,6 +15,7 @@ import { Route as SignInRouteRouteImport } from './routes/sign-in/route'
 import { Route as SignUpRouteRouteImport } from './routes/sign-up/route'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardNewRouteImport } from './routes/dashboard/new'
+import { Route as GithubCallbackRouteImport } from './routes/github/callback'
 import { Route as ProjectsProjectIdRouteRouteImport } from './routes/projects/$projectId/route'
 import { Route as SignInIndexRouteImport } from './routes/sign-in/index'
 import { Route as SignInSplatRouteImport } from './routes/sign-in/$'
@@ -24,9 +25,13 @@ import { Route as ProjectsProjectIdIndexRouteImport } from './routes/projects/$p
 import { Route as ProjectsProjectIdConfigRouteImport } from './routes/projects/$projectId/config'
 import { Route as ProjectsProjectIdEditRouteImport } from './routes/projects/$projectId/edit'
 import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
+import { Route as ProjectsProjectIdGithub_servicesNewRouteImport } from './routes/projects/$projectId/github_services/new'
+import { Route as ProjectsProjectIdIntegrationsIndexRouteImport } from './routes/projects/$projectId/integrations/index'
 import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
 import { Route as ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport } from './routes/projects/$projectId/databases/$databaseId/index'
 import { Route as ProjectsProjectIdDatabasesDatabaseIdEditRouteImport } from './routes/projects/$projectId/databases/$databaseId/edit'
+import { Route as ProjectsProjectIdGithub_servicesGithubServiceIdIndexRouteImport } from './routes/projects/$projectId/github_services/$githubServiceId/index'
+import { Route as ProjectsProjectIdGithub_servicesGithubServiceIdEditRouteImport } from './routes/projects/$projectId/github_services/$githubServiceId/edit'
 import { Route as ProjectsProjectIdServicesServiceIdIndexRouteImport } from './routes/projects/$projectId/services/$serviceId/index'
 import { Route as ProjectsProjectIdServicesServiceIdEditRouteImport } from './routes/projects/$projectId/services/$serviceId/edit'
 
@@ -59,6 +64,11 @@ const DashboardNewRoute = DashboardNewRouteImport.update({
   id: '/new',
   path: '/new',
   getParentRoute: () => DashboardRouteRoute,
+} as any)
+const GithubCallbackRoute = GithubCallbackRouteImport.update({
+  id: '/github/callback',
+  path: '/github/callback',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsProjectIdRouteRoute = ProjectsProjectIdRouteRouteImport.update({
   id: '/projects/$projectId',
@@ -106,6 +116,18 @@ const ProjectsProjectIdDatabasesNewRoute =
     path: '/databases/new',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
+const ProjectsProjectIdGithub_servicesNewRoute =
+  ProjectsProjectIdGithub_servicesNewRouteImport.update({
+    id: '/github_services/new',
+    path: '/github_services/new',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdIntegrationsIndexRoute =
+  ProjectsProjectIdIntegrationsIndexRouteImport.update({
+    id: '/integrations/',
+    path: '/integrations/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
 const ProjectsProjectIdServicesNewRoute =
   ProjectsProjectIdServicesNewRouteImport.update({
     id: '/services/new',
@@ -122,6 +144,18 @@ const ProjectsProjectIdDatabasesDatabaseIdEditRoute =
   ProjectsProjectIdDatabasesDatabaseIdEditRouteImport.update({
     id: '/databases/$databaseId/edit',
     path: '/databases/$databaseId/edit',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute =
+  ProjectsProjectIdGithub_servicesGithubServiceIdIndexRouteImport.update({
+    id: '/github_services/$githubServiceId/',
+    path: '/github_services/$githubServiceId/',
+    getParentRoute: () => ProjectsProjectIdRouteRoute,
+  } as any)
+const ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute =
+  ProjectsProjectIdGithub_servicesGithubServiceIdEditRouteImport.update({
+    id: '/github_services/$githubServiceId/edit',
+    path: '/github_services/$githubServiceId/edit',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
 const ProjectsProjectIdServicesServiceIdIndexRoute =
@@ -144,6 +178,7 @@ export interface FileRoutesByFullPath {
   '/sign-up': typeof SignUpRouteRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/dashboard/new': typeof DashboardNewRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -153,15 +188,20 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/integrations/': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
   '/projects/$projectId/databases/$databaseId/': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/github_services/$githubServiceId/': typeof ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute
   '/projects/$projectId/services/$serviceId/': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard/new': typeof DashboardNewRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -171,10 +211,14 @@ export interface FileRoutesByTo {
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/integrations': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
   '/projects/$projectId/databases/$databaseId': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/github_services/$githubServiceId': typeof ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute
   '/projects/$projectId/services/$serviceId': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRoutesById {
@@ -185,6 +229,7 @@ export interface FileRoutesById {
   '/sign-up': typeof SignUpRouteRouteWithChildren
   '/projects/$projectId': typeof ProjectsProjectIdRouteRouteWithChildren
   '/dashboard/new': typeof DashboardNewRoute
+  '/github/callback': typeof GithubCallbackRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -194,10 +239,14 @@ export interface FileRoutesById {
   '/projects/$projectId/edit': typeof ProjectsProjectIdEditRoute
   '/projects/$projectId/': typeof ProjectsProjectIdIndexRoute
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
+  '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
+  '/projects/$projectId/integrations/': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
   '/projects/$projectId/databases/$databaseId/': typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  '/projects/$projectId/github_services/$githubServiceId/': typeof ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute
   '/projects/$projectId/services/$serviceId/': typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -209,6 +258,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/projects/$projectId'
     | '/dashboard/new'
+    | '/github/callback'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/dashboard/'
@@ -218,15 +268,20 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
+    | '/projects/$projectId/integrations/'
     | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
     | '/projects/$projectId/databases/$databaseId/'
+    | '/projects/$projectId/github_services/$githubServiceId/'
     | '/projects/$projectId/services/$serviceId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard/new'
+    | '/github/callback'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/dashboard'
@@ -236,10 +291,14 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit'
     | '/projects/$projectId'
     | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
+    | '/projects/$projectId/integrations'
     | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
     | '/projects/$projectId/databases/$databaseId'
+    | '/projects/$projectId/github_services/$githubServiceId'
     | '/projects/$projectId/services/$serviceId'
   id:
     | '__root__'
@@ -249,6 +308,7 @@ export interface FileRouteTypes {
     | '/sign-up'
     | '/projects/$projectId'
     | '/dashboard/new'
+    | '/github/callback'
     | '/sign-in/$'
     | '/sign-up/$'
     | '/dashboard/'
@@ -258,10 +318,14 @@ export interface FileRouteTypes {
     | '/projects/$projectId/edit'
     | '/projects/$projectId/'
     | '/projects/$projectId/databases/new'
+    | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
+    | '/projects/$projectId/integrations/'
     | '/projects/$projectId/databases/$databaseId/edit'
+    | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
     | '/projects/$projectId/databases/$databaseId/'
+    | '/projects/$projectId/github_services/$githubServiceId/'
     | '/projects/$projectId/services/$serviceId/'
   fileRoutesById: FileRoutesById
 }
@@ -271,6 +335,7 @@ export interface RootRouteChildren {
   SignInRouteRoute: typeof SignInRouteRouteWithChildren
   SignUpRouteRoute: typeof SignUpRouteRouteWithChildren
   ProjectsProjectIdRouteRoute: typeof ProjectsProjectIdRouteRouteWithChildren
+  GithubCallbackRoute: typeof GithubCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -316,6 +381,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/new'
       preLoaderRoute: typeof DashboardNewRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/github/callback': {
+      id: '/github/callback'
+      path: '/github/callback'
+      fullPath: '/github/callback'
+      preLoaderRoute: typeof GithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/projects/$projectId': {
       id: '/projects/$projectId'
@@ -380,6 +452,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdDatabasesNewRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
+    '/projects/$projectId/github_services/new': {
+      id: '/projects/$projectId/github_services/new'
+      path: '/github_services/new'
+      fullPath: '/projects/$projectId/github_services/new'
+      preLoaderRoute: typeof ProjectsProjectIdGithub_servicesNewRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/integrations/': {
+      id: '/projects/$projectId/integrations/'
+      path: '/integrations'
+      fullPath: '/projects/$projectId/integrations/'
+      preLoaderRoute: typeof ProjectsProjectIdIntegrationsIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
     '/projects/$projectId/services/new': {
       id: '/projects/$projectId/services/new'
       path: '/services/new'
@@ -399,6 +485,20 @@ declare module '@tanstack/react-router' {
       path: '/databases/$databaseId/edit'
       fullPath: '/projects/$projectId/databases/$databaseId/edit'
       preLoaderRoute: typeof ProjectsProjectIdDatabasesDatabaseIdEditRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/github_services/$githubServiceId/': {
+      id: '/projects/$projectId/github_services/$githubServiceId/'
+      path: '/github_services/$githubServiceId'
+      fullPath: '/projects/$projectId/github_services/$githubServiceId/'
+      preLoaderRoute: typeof ProjectsProjectIdGithub_servicesGithubServiceIdIndexRouteImport
+      parentRoute: typeof ProjectsProjectIdRouteRoute
+    }
+    '/projects/$projectId/github_services/$githubServiceId/edit': {
+      id: '/projects/$projectId/github_services/$githubServiceId/edit'
+      path: '/github_services/$githubServiceId/edit'
+      fullPath: '/projects/$projectId/github_services/$githubServiceId/edit'
+      preLoaderRoute: typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
     '/projects/$projectId/services/$serviceId/': {
@@ -465,10 +565,14 @@ interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdEditRoute: typeof ProjectsProjectIdEditRoute
   ProjectsProjectIdIndexRoute: typeof ProjectsProjectIdIndexRoute
   ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
+  ProjectsProjectIdGithub_servicesNewRoute: typeof ProjectsProjectIdGithub_servicesNewRoute
   ProjectsProjectIdServicesNewRoute: typeof ProjectsProjectIdServicesNewRoute
+  ProjectsProjectIdIntegrationsIndexRoute: typeof ProjectsProjectIdIntegrationsIndexRoute
   ProjectsProjectIdDatabasesDatabaseIdEditRoute: typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
+  ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute: typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   ProjectsProjectIdServicesServiceIdEditRoute: typeof ProjectsProjectIdServicesServiceIdEditRoute
   ProjectsProjectIdDatabasesDatabaseIdIndexRoute: typeof ProjectsProjectIdDatabasesDatabaseIdIndexRoute
+  ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute: typeof ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute
   ProjectsProjectIdServicesServiceIdIndexRoute: typeof ProjectsProjectIdServicesServiceIdIndexRoute
 }
 
@@ -478,13 +582,21 @@ const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
     ProjectsProjectIdEditRoute: ProjectsProjectIdEditRoute,
     ProjectsProjectIdIndexRoute: ProjectsProjectIdIndexRoute,
     ProjectsProjectIdDatabasesNewRoute: ProjectsProjectIdDatabasesNewRoute,
+    ProjectsProjectIdGithub_servicesNewRoute:
+      ProjectsProjectIdGithub_servicesNewRoute,
     ProjectsProjectIdServicesNewRoute: ProjectsProjectIdServicesNewRoute,
+    ProjectsProjectIdIntegrationsIndexRoute:
+      ProjectsProjectIdIntegrationsIndexRoute,
     ProjectsProjectIdDatabasesDatabaseIdEditRoute:
       ProjectsProjectIdDatabasesDatabaseIdEditRoute,
+    ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute:
+      ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute,
     ProjectsProjectIdServicesServiceIdEditRoute:
       ProjectsProjectIdServicesServiceIdEditRoute,
     ProjectsProjectIdDatabasesDatabaseIdIndexRoute:
       ProjectsProjectIdDatabasesDatabaseIdIndexRoute,
+    ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute:
+      ProjectsProjectIdGithub_servicesGithubServiceIdIndexRoute,
     ProjectsProjectIdServicesServiceIdIndexRoute:
       ProjectsProjectIdServicesServiceIdIndexRoute,
   }
@@ -500,6 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   SignInRouteRoute: SignInRouteRouteWithChildren,
   SignUpRouteRoute: SignUpRouteRouteWithChildren,
   ProjectsProjectIdRouteRoute: ProjectsProjectIdRouteRouteWithChildren,
+  GithubCallbackRoute: GithubCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

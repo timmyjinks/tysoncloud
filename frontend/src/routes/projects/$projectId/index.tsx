@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronDown,
@@ -10,7 +10,6 @@ import {
   Server,
   Trash2,
 } from "lucide-react";
-import { useCreateGithubConnection, useGithubApp, useGithubConnections } from "@/lib/api/github";
 import { useProject } from "@/lib/api/projects";
 import { useDeleteService, useDeleteServices, useServices } from "@/lib/api/services";
 import { useDatabases, useDeleteDatabase, useDeleteDatabases } from "@/lib/api/databases";
@@ -63,118 +62,6 @@ function ProjectDetail() {
     error: githubServicesError,
     refetch: refetchGithubServices,
   } = useGithubServices(projectId);
-
-  // GitHub App install popup — Integrations button on project page
-  const { data: appInfo } = useGithubApp();
-  const { data: connections, refetch: refetchGithubConnection } = useGithubConnections();
-  const createGithubConnection = useCreateGithubConnection();
-  const isGithubConnected = (connections?.length ?? 0) > 0;
-  const installUrl = appInfo?.install_url || "";
-  const installUrlWithState = installUrl
-    ? `${installUrl}${installUrl.includes("?") ? "&" : "?"}state=${encodeURIComponent(projectId)}`
-    : "";
-  const popupRef = useRef<Window | null>(null);
-  const handledRef = useRef(false);
-  const handleIntegrateWithGithub = () => {
-    if (!installUrlWithState) return;
-    handledRef.current = false;
-    const w = 600;
-    const h = 700;
-    const left = window.screenX + (window.outerWidth - w) / 2;
-    const top = window.screenY + (window.outerHeight - h) / 2;
-    const popup = window.open(
-      installUrlWithState,
-      "tysoncloud-github-install",
-      `popup=yes,width=${w},height=${h},left=${left},top=${top},scrollbars=yes`,
-    );
-    if (!popup) {
-      window.location.href = installUrlWithState;
-      return;
-    }
-    popupRef.current = popup;
-    const timer = window.setInterval(() => {
-      if (popup.closed) {
-        window.clearInterval(timer);
-        popupRef.current = null;
-        refetchGithubConnection();
-        refetchGithubServices();
-        return;
-      }
-      if (handledRef.current) return;
-      try {
-        const href = popup.location.href;
-        if (href.includes("/github/callback") && href.includes("installation_id=")) {
-          const url = new URL(href);
-          const iid = url.searchParams.get("installation_id");
-          if (iid && !handledRef.current) {
-            handledRef.current = true;
-            window.clearInterval(timer);
-            createGithubConnection.mutate(
-              { installation_id: Number(iid) },
-              {
-                onSuccess: () => {
-                  try {
-                    popup.close();
-                  } catch {}
-                  popupRef.current = null;
-                  refetchGithubConnection();
-                  refetchGithubServices();
-                },
-                onError: () => {
-                  try {
-                    popup.close();
-                  } catch {}
-                  popupRef.current = null;
-                  refetchGithubConnection();
-                  refetchGithubServices();
-                },
-              },
-            );
-          }
-        }
-      } catch {}
-    }, 500);
-  };
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type !== "github-app-installed") return;
-      if (handledRef.current) return;
-      const installationId = event.data.installation_id as string | undefined;
-      if (installationId) {
-        handledRef.current = true;
-        createGithubConnection.mutate(
-          { installation_id: Number(installationId) },
-          {
-            onSuccess: () => {
-              try {
-                popupRef.current?.close();
-              } catch {}
-              popupRef.current = null;
-              refetchGithubConnection();
-              refetchGithubServices();
-            },
-            onError: () => {
-              try {
-                popupRef.current?.close();
-              } catch {}
-              popupRef.current = null;
-              refetchGithubConnection();
-              refetchGithubServices();
-            },
-          },
-        );
-      } else {
-        try {
-          popupRef.current?.close();
-        } catch {}
-        popupRef.current = null;
-        refetchGithubConnection();
-        refetchGithubServices();
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [createGithubConnection, refetchGithubConnection, refetchGithubServices]);
 
   const deleteService = useDeleteService(projectId);
   const deleteDatabase = useDeleteDatabase(projectId);
@@ -313,33 +200,12 @@ function ProjectDetail() {
         }
         description="Everything deployed in this project"
       >
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleIntegrateWithGithub}
-            title={isGithubConnected ? "GitHub is connected — click to manage/reinstall" : "Connect GitHub"}
-          >
-            <Github className="h-4 w-4" />
-            Integrations
-            <span
-              className={`ml-1 inline-flex h-2 w-2 rounded-full ${isGithubConnected ? "bg-emerald-500" : "bg-zinc-400"}`}
-              aria-hidden
-            />
-            <span className={`text-xs ${isGithubConnected ? "text-emerald-600" : "text-[var(--color-text-faint)]"}`}>
-              {isGithubConnected ? "Connected" : "Not connected"}
-            </span>
+        <Link to="/projects/$projectId/config" params={{ projectId }}>
+          <Button variant="outline" size="sm">
+            <FileCode className="h-4 w-4" />
+            Config
           </Button>
-          {createGithubConnection.isError && (
-            <span className="ml-2 text-xs text-red-500">{getErrorMessage(createGithubConnection.error)}</span>
-          )}
-          <Link to="/projects/$projectId/config" params={{ projectId }}>
-            <Button variant="outline" size="sm">
-              <FileCode className="h-4 w-4" />
-              Config
-            </Button>
-          </Link>
-        </div>
+        </Link>
       </PageHeader>
 
       <div className="mt-10 mb-4 flex items-center justify-between">

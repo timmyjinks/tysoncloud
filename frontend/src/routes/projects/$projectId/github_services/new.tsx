@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Github, Lock, Search, X } from "lucide-react";
 import { useCreateGithubService, useGithubConnections, useGithubRepos } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { FormShell } from "@/components/form-shell";
@@ -25,10 +26,11 @@ function NewGithubServicePage() {
   const [repo, setRepo] = useState("");
   const [repoId, setRepoId] = useState("");
   const [port, setPort] = useState("3000");
-  const [rootDir, setRootDir] = useState(".");
+  const [rootDir, setRootDir] = useState("");
   const [domain, setDomain] = useState("");
   const [env, setEnv] = useState("");
   const [filter, setFilter] = useState("");
+  const [repoError, setRepoError] = useState<string | null>(null);
 
   const repos = useMemo(() => reposData?.repositories ?? [], [reposData]);
 
@@ -48,6 +50,11 @@ function NewGithubServicePage() {
       description="Build and deploy a container from a GitHub repository."
       onSubmit={(e) => {
         e.preventDefault();
+        if (!repo || !repoId) {
+          setRepoError("Please select a repository from the list.");
+          return;
+        }
+        setRepoError(null);
         const trimmed = domain.trim();
         const toPayload = (raw: string): string | undefined => {
           let v = raw.trim();
@@ -64,7 +71,7 @@ function NewGithubServicePage() {
             repo_id: Number(repoId),
             port: Number(port),
             domain: payloadDomain,
-            root_dir: rootDir || ".",
+            root_dir: rootDir.trim() || ".",
             env,
           },
           { onSuccess: () => navigate({ to: "/projects/$projectId", params: { projectId } }) },
@@ -76,7 +83,7 @@ function NewGithubServicePage() {
       pendingLabel="Deploying…"
       cancelTo="/projects/$projectId"
     >
-      {!hasConnection && <ErrorBanner message="No GitHub connection found. Use the Integrations button on the project page to connect." />}
+      {!hasConnection && <ErrorBanner message="No GitHub connection found. Connect GitHub from the sidebar Integrations section." />}
 
       <div>
         <Label htmlFor="name">Service name</Label>
@@ -91,7 +98,7 @@ function NewGithubServicePage() {
       </div>
 
       <div>
-        <Label htmlFor="repo">Repository</Label>
+        <Label htmlFor="repo-filter">Repository</Label>
         {reposLoading ? (
           <p className="mt-2 text-sm text-[var(--color-text-faint)]">loading repositories…</p>
         ) : reposError ? (
@@ -102,62 +109,76 @@ function NewGithubServicePage() {
           </p>
         ) : (
           <>
-            <Input
-              id="repo-filter"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="Filter repositories…"
-              className="mt-2"
-            />
-            <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)]">
-              {filteredRepos.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-[var(--color-text-faint)]">No matches.</p>
-              ) : (
-                filteredRepos.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => {
-                      setRepo(r.full_name);
-                      setRepoId(String(r.id));
-                    }}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-[var(--color-surface-hover)] ${repo === r.full_name ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-text)]"}`}
-                  >
-                    <span className="font-mono">{r.full_name}</span>
-                    <span className="ml-2 shrink-0 text-xs text-[var(--color-text-faint)]">
-                      {r.private ? "private" : "public"}
-                    </span>
-                  </button>
-                ))
-              )}
+            <div className="relative mt-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-text-faint)]" />
+              <Input
+                id="repo-filter"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder="Search repositories…"
+                className="pl-9"
+              />
+            </div>
+
+            {repo && (
+              <div className="mt-3 flex items-center justify-between rounded-md border border-[var(--color-accent)] bg-[var(--color-accent-soft)] px-3 py-2">
+                <span className="flex items-center gap-2 text-sm">
+                  <Github className="h-4 w-4 shrink-0 text-[var(--color-accent)]" />
+                  <span className="font-mono font-medium text-[var(--color-accent)]">{repo}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRepo("");
+                    setRepoId("");
+                  }}
+                  className="cursor-pointer rounded p-1 text-[var(--color-accent)] hover:bg-black/5"
+                  aria-label="Clear selected repository"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="mt-2 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <div className="max-h-64 overflow-y-auto divide-y divide-[var(--color-border)]">
+                {filteredRepos.length === 0 ? (
+                  <p className="px-3 py-8 text-center text-sm text-[var(--color-text-faint)]">No matches.</p>
+                ) : (
+                  filteredRepos.map((r) => {
+                    const selected = repo === r.full_name;
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => {
+                          setRepo(r.full_name);
+                          setRepoId(String(r.id));
+                          setRepoError(null);
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-surface-2)] ${selected ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)]" : "text-[var(--color-text)]"}`}
+                      >
+                        <span className="truncate font-mono">{r.full_name}</span>
+                        <span className="ml-2 inline-flex shrink-0 items-center gap-1 text-xs text-[var(--color-text-faint)]">
+                          {r.private && <Lock className="h-3 w-3" />}
+                          {r.private ? "private" : "public"}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-xs text-[var(--color-text-faint)]">
+                {filteredRepos.length} of {repos.length} repositories
+                {repo ? " · selected" : ""}
+              </div>
             </div>
           </>
         )}
-        <Input
-          id="repo"
-          required
-          value={repo}
-          onChange={(e) => {
-            const v = e.target.value;
-            setRepo(v);
-            const match = repos.find((r) => r.full_name === v);
-            setRepoId(match ? String(match.id) : repoId);
-          }}
-          placeholder="owner/repo"
-          className="mt-3 font-mono"
-        />
-        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          Select from above or type owner/repo. Repo ID is set automatically when you pick a repo.
-        </p>
-        <Input
-          id="repo_id"
-          required
-          value={repoId}
-          onChange={(e) => setRepoId(e.target.value)}
-          placeholder="123456789"
-          className="mt-2 font-mono"
-        />
-        <p className="mt-1 text-xs text-[var(--color-text-faint)]">GitHub repository ID (numeric).</p>
+        {repoError && <p className="mt-2 text-xs text-red-500">{repoError}</p>}
+        {!repo && !reposLoading && !reposError && repos.length > 0 && (
+          <p className="mt-2 text-xs text-[var(--color-text-muted)]">Select a repository from the list above.</p>
+        )}
       </div>
 
       <div>
@@ -166,11 +187,12 @@ function NewGithubServicePage() {
           id="root_dir"
           value={rootDir}
           onChange={(e) => setRootDir(e.target.value)}
-          placeholder="."
+          placeholder="/ (repository root)"
           className="mt-2 font-mono"
         />
         <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-          Subdirectory containing your Dockerfile or railpack build. Use <code className="font-mono">.</code> for repo root.
+          Leave empty for the repository root, or enter a subdirectory (e.g.{" "}
+          <code className="font-mono">apps/web</code>).
         </p>
       </div>
 

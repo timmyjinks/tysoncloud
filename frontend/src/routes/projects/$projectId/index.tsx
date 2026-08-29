@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  ChevronDown,
   Database as DatabaseIcon,
   FileCode,
   Github,
@@ -9,7 +10,7 @@ import {
   Server,
   Trash2,
 } from "lucide-react";
-import { useGithubApp, useGithubConnections } from "@/lib/api/github";
+import { useCreateGithubConnection, useGithubApp, useGithubConnections } from "@/lib/api/github";
 import { useProject } from "@/lib/api/projects";
 import { useDeleteService, useDeleteServices, useServices } from "@/lib/api/services";
 import { useDatabases, useDeleteDatabase, useDeleteDatabases } from "@/lib/api/databases";
@@ -26,6 +27,7 @@ import { BulkDeleteConfirmDialog } from "@/components/bulk-delete-confirm-dialog
 import { ErrorBanner } from "@/components/error-banner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Service, Database, GithubService } from "@/lib/api/types";
@@ -65,13 +67,17 @@ function ProjectDetail() {
   // GitHub App install popup — Integrations button on project page
   const { data: appInfo } = useGithubApp();
   const { data: connections, refetch: refetchGithubConnection } = useGithubConnections();
+  const createGithubConnection = useCreateGithubConnection();
   const isGithubConnected = (connections?.length ?? 0) > 0;
   const installUrl = appInfo?.install_url || "";
   const installUrlWithState = installUrl
     ? `${installUrl}${installUrl.includes("?") ? "&" : "?"}state=${encodeURIComponent(projectId)}`
     : "";
+  const popupRef = useRef<Window | null>(null);
+  const handledRef = useRef(false);
   const handleIntegrateWithGithub = () => {
     if (!installUrlWithState) return;
+    handledRef.current = false;
     const w = 600;
     const h = 700;
     const left = window.screenX + (window.outerWidth - w) / 2;
@@ -85,25 +91,90 @@ function ProjectDetail() {
       window.location.href = installUrlWithState;
       return;
     }
+    popupRef.current = popup;
     const timer = window.setInterval(() => {
       if (popup.closed) {
         window.clearInterval(timer);
+        popupRef.current = null;
         refetchGithubConnection();
         refetchGithubServices();
+        return;
       }
+      if (handledRef.current) return;
+      try {
+        const href = popup.location.href;
+        if (href.includes("/github/callback") && href.includes("installation_id=")) {
+          const url = new URL(href);
+          const iid = url.searchParams.get("installation_id");
+          if (iid && !handledRef.current) {
+            handledRef.current = true;
+            window.clearInterval(timer);
+            createGithubConnection.mutate(
+              { installation_id: Number(iid) },
+              {
+                onSuccess: () => {
+                  try {
+                    popup.close();
+                  } catch {}
+                  popupRef.current = null;
+                  refetchGithubConnection();
+                  refetchGithubServices();
+                },
+                onError: () => {
+                  try {
+                    popup.close();
+                  } catch {}
+                  popupRef.current = null;
+                  refetchGithubConnection();
+                  refetchGithubServices();
+                },
+              },
+            );
+          }
+        }
+      } catch {}
     }, 500);
   };
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "github-app-installed") {
+      if (event.data?.type !== "github-app-installed") return;
+      if (handledRef.current) return;
+      const installationId = event.data.installation_id as string | undefined;
+      if (installationId) {
+        handledRef.current = true;
+        createGithubConnection.mutate(
+          { installation_id: Number(installationId) },
+          {
+            onSuccess: () => {
+              try {
+                popupRef.current?.close();
+              } catch {}
+              popupRef.current = null;
+              refetchGithubConnection();
+              refetchGithubServices();
+            },
+            onError: () => {
+              try {
+                popupRef.current?.close();
+              } catch {}
+              popupRef.current = null;
+              refetchGithubConnection();
+              refetchGithubServices();
+            },
+          },
+        );
+      } else {
+        try {
+          popupRef.current?.close();
+        } catch {}
+        popupRef.current = null;
         refetchGithubConnection();
         refetchGithubServices();
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [refetchGithubConnection, refetchGithubServices]);
+  }, [createGithubConnection, refetchGithubConnection, refetchGithubServices]);
 
   const deleteService = useDeleteService(projectId);
   const deleteDatabase = useDeleteDatabase(projectId);
@@ -259,6 +330,9 @@ function ProjectDetail() {
               {isGithubConnected ? "Connected" : "Not connected"}
             </span>
           </Button>
+          {createGithubConnection.isError && (
+            <span className="ml-2 text-xs text-red-500">{getErrorMessage(createGithubConnection.error)}</span>
+          )}
           <Link to="/projects/$projectId/config" params={{ projectId }}>
             <Button variant="outline" size="sm">
               <FileCode className="h-4 w-4" />
@@ -282,26 +356,49 @@ function ProjectDetail() {
             <span className="text-[var(--color-text-faint)]">· {resources.length} total</span>
           </h2>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/projects/$projectId/databases/new" params={{ projectId }}>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4" />
-              Database
-            </Button>
-          </Link>
-          <Link to="/projects/$projectId/github_services/new" params={{ projectId }}>
-            <Button size="sm" variant="outline">
-              <Github className="h-4 w-4" />
-              GitHub
-            </Button>
-          </Link>
-          <Link to="/projects/$projectId/services/new" params={{ projectId }}>
+        <DropdownMenu
+          trigger={
             <Button size="sm">
               <Plus className="h-4 w-4" />
-              Service
+              New
+              <ChevronDown className="h-4 w-4 opacity-60" />
             </Button>
-          </Link>
-        </div>
+          }
+        >
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/services/new",
+                params: { projectId },
+              })
+            }
+          >
+            <Server className="h-4 w-4" />
+            Service
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/github_services/new",
+                params: { projectId },
+              })
+            }
+          >
+            <Github className="h-4 w-4" />
+            GitHub Service
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/databases/new",
+                params: { projectId },
+              })
+            }
+          >
+            <DatabaseIcon className="h-4 w-4" />
+            Database
+          </DropdownMenuItem>
+        </DropdownMenu>
       </div>
 
       {selectedIds.size > 0 && (

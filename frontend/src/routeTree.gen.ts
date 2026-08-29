@@ -26,7 +26,6 @@ import { Route as ProjectsProjectIdConfigRouteImport } from './routes/projects/$
 import { Route as ProjectsProjectIdEditRouteImport } from './routes/projects/$projectId/edit'
 import { Route as ProjectsProjectIdDatabasesNewRouteImport } from './routes/projects/$projectId/databases/new'
 import { Route as ProjectsProjectIdGithub_servicesNewRouteImport } from './routes/projects/$projectId/github_services/new'
-import { Route as ProjectsProjectIdIntegrationsIndexRouteImport } from './routes/projects/$projectId/integrations/index'
 import { Route as ProjectsProjectIdServicesNewRouteImport } from './routes/projects/$projectId/services/new'
 import { Route as ProjectsProjectIdDatabasesDatabaseIdIndexRouteImport } from './routes/projects/$projectId/databases/$databaseId/index'
 import { Route as ProjectsProjectIdDatabasesDatabaseIdEditRouteImport } from './routes/projects/$projectId/databases/$databaseId/edit'
@@ -122,12 +121,6 @@ const ProjectsProjectIdGithub_servicesNewRoute =
     path: '/github_services/new',
     getParentRoute: () => ProjectsProjectIdRouteRoute,
   } as any)
-const ProjectsProjectIdIntegrationsIndexRoute =
-  ProjectsProjectIdIntegrationsIndexRouteImport.update({
-    id: '/integrations/',
-    path: '/integrations/',
-    getParentRoute: () => ProjectsProjectIdRouteRoute,
-  } as any)
 const ProjectsProjectIdServicesNewRoute =
   ProjectsProjectIdServicesNewRouteImport.update({
     id: '/services/new',
@@ -190,7 +183,6 @@ export interface FileRoutesByFullPath {
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
-  '/projects/$projectId/integrations/': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
   '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
@@ -213,7 +205,6 @@ export interface FileRoutesByTo {
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
-  '/projects/$projectId/integrations': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
   '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
@@ -241,7 +232,6 @@ export interface FileRoutesById {
   '/projects/$projectId/databases/new': typeof ProjectsProjectIdDatabasesNewRoute
   '/projects/$projectId/github_services/new': typeof ProjectsProjectIdGithub_servicesNewRoute
   '/projects/$projectId/services/new': typeof ProjectsProjectIdServicesNewRoute
-  '/projects/$projectId/integrations/': typeof ProjectsProjectIdIntegrationsIndexRoute
   '/projects/$projectId/databases/$databaseId/edit': typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
   '/projects/$projectId/github_services/$githubServiceId/edit': typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   '/projects/$projectId/services/$serviceId/edit': typeof ProjectsProjectIdServicesServiceIdEditRoute
@@ -270,7 +260,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
-    | '/projects/$projectId/integrations/'
     | '/projects/$projectId/databases/$databaseId/edit'
     | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
@@ -293,7 +282,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
-    | '/projects/$projectId/integrations'
     | '/projects/$projectId/databases/$databaseId/edit'
     | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
@@ -320,7 +308,6 @@ export interface FileRouteTypes {
     | '/projects/$projectId/databases/new'
     | '/projects/$projectId/github_services/new'
     | '/projects/$projectId/services/new'
-    | '/projects/$projectId/integrations/'
     | '/projects/$projectId/databases/$databaseId/edit'
     | '/projects/$projectId/github_services/$githubServiceId/edit'
     | '/projects/$projectId/services/$serviceId/edit'
@@ -459,13 +446,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsProjectIdGithub_servicesNewRouteImport
       parentRoute: typeof ProjectsProjectIdRouteRoute
     }
-    '/projects/$projectId/integrations/': {
-      id: '/projects/$projectId/integrations/'
-      path: '/integrations'
-      fullPath: '/projects/$projectId/integrations/'
-      preLoaderRoute: typeof ProjectsProjectIdIntegrationsIndexRouteImport
-      parentRoute: typeof ProjectsProjectIdRouteRoute
-    }
     '/projects/$projectId/services/new': {
       id: '/projects/$projectId/services/new'
       path: '/services/new'
@@ -567,7 +547,6 @@ interface ProjectsProjectIdRouteRouteChildren {
   ProjectsProjectIdDatabasesNewRoute: typeof ProjectsProjectIdDatabasesNewRoute
   ProjectsProjectIdGithub_servicesNewRoute: typeof ProjectsProjectIdGithub_servicesNewRoute
   ProjectsProjectIdServicesNewRoute: typeof ProjectsProjectIdServicesNewRoute
-  ProjectsProjectIdIntegrationsIndexRoute: typeof ProjectsProjectIdIntegrationsIndexRoute
   ProjectsProjectIdDatabasesDatabaseIdEditRoute: typeof ProjectsProjectIdDatabasesDatabaseIdEditRoute
   ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute: typeof ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute
   ProjectsProjectIdServicesServiceIdEditRoute: typeof ProjectsProjectIdServicesServiceIdEditRoute
@@ -585,8 +564,6 @@ const ProjectsProjectIdRouteRouteChildren: ProjectsProjectIdRouteRouteChildren =
     ProjectsProjectIdGithub_servicesNewRoute:
       ProjectsProjectIdGithub_servicesNewRoute,
     ProjectsProjectIdServicesNewRoute: ProjectsProjectIdServicesNewRoute,
-    ProjectsProjectIdIntegrationsIndexRoute:
-      ProjectsProjectIdIntegrationsIndexRoute,
     ProjectsProjectIdDatabasesDatabaseIdEditRoute:
       ProjectsProjectIdDatabasesDatabaseIdEditRoute,
     ProjectsProjectIdGithub_servicesGithubServiceIdEditRoute:

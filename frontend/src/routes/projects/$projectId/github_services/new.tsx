@@ -6,7 +6,6 @@ import { FormShell } from "@/components/form-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/error-banner";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 
@@ -19,7 +18,7 @@ function NewGithubServicePage() {
   const navigate = useNavigate();
   const createGithubService = useCreateGithubService(projectId);
   const { data: connections } = useGithubConnections();
-  const installationId = connections?.[0]?.installation_id ?? "";
+  const installationId = connections?.[0]?.installation_id ? String(connections[0].installation_id) : "";
   const { data: reposData, isLoading: reposLoading, error: reposError } = useGithubRepos(installationId);
 
   const [name, setName] = useState("");
@@ -62,7 +61,7 @@ function NewGithubServicePage() {
           {
             name,
             repo,
-            repo_id: repoId,
+            repo_id: Number(repoId),
             port: Number(port),
             domain: payloadDomain,
             root_dir: rootDir || ".",
@@ -77,9 +76,7 @@ function NewGithubServicePage() {
       pendingLabel="Deploying…"
       cancelTo="/projects/$projectId"
     >
-      {!hasConnection && (
-        <ErrorBanner message="No GitHub connection found. Connect your GitHub account in Integrations first." />
-      )}
+      {!hasConnection && <ErrorBanner message="No GitHub connection found. Use the Integrations button on the project page to connect." />}
 
       <div>
         <Label htmlFor="name">Service name</Label>
@@ -256,23 +253,7 @@ function NewGithubServicePage() {
         <code className="font-mono">{SERVICE_RESOURCE_LIMITS.memory}</code> memory. Pushes to the repo will auto-redeploy.
       </p>
 
-      {!hasConnection && (
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              navigate({
-                to: "/projects/$projectId/integrations",
-                params: { projectId },
-                search: {} as never,
-              })
-            }
-          >
-            Go to Integrations
-          </Button>
-        </div>
-      )}
+
     </FormShell>
   );
 }

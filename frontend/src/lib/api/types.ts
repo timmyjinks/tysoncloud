@@ -97,7 +97,7 @@ export type GithubService = {
   project_id: string;
   name: string;
   repo: string;
-  repo_id: string;
+  repo_id: number;
   root_dir: string;
   port: number;
   status: string;
@@ -110,7 +110,7 @@ export type GithubService = {
 export type GithubServiceCreateRequest = {
   name: string;
   repo: string;
-  repo_id: string;
+  repo_id: number;
   port: number;
   domain?: string | null;
   root_dir: string;
@@ -127,12 +127,12 @@ export type GithubServiceUpdateRequest = {
 export type GithubConnection = {
   id: string;
   user_id: string;
-  installation_id: string;
+  installation_id: number;
   created_at: string;
 };
 
 export type GithubConnectionCreateRequest = {
-  installation_id: string;
+  installation_id: number;
 };
 
 export type GithubRepo = {

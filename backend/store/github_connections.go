@@ -6,10 +6,10 @@ import (
 )
 
 type GithubConnectionsTable struct {
-	Id             string    `json:"id"`
+	Id             string    `json:"id,omitempty"`
 	UserId         string    `json:"user_id"`
-	InstallationId string    `json:"installation_id"`
-	CreatedAt      time.Time `json:"created_at"`
+	InstallationId int64     `json:"installation_id"`
+	CreatedAt      time.Time `json:"created_at,omitempty"`
 }
 
 func (s *SupabaseStore) GetGithubConnection(userId string) (GithubConnectionsTable, error) {
@@ -48,7 +48,7 @@ func (s *SupabaseStore) GetGithubConnectionByInstallationId(installationId strin
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateGithubConnection(userId, installationId string) error {
+func (s *SupabaseStore) CreateGithubConnection(userId string, installationId int64) error {
 	_, _, err := s.cli.From("github_connections").Insert(GithubConnectionsTable{
 		UserId:         userId,
 		InstallationId: installationId,

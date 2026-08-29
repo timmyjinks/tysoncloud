@@ -2,6 +2,7 @@ package store
 
 import (
 	"encoding/json"
+	"strconv"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -11,7 +12,7 @@ type GithubServicesTable struct {
 	Id                 string    `json:"id"`
 	ProjectId          string    `json:"project_id"`
 	GithubConnectionId string    `json:"github_connection_id"`
-	RepoId             string    `json:"repo_id"`
+	RepoId             int64     `json:"repo_id"`
 	RepoName           string    `json:"repo_name"`
 	Name               string    `json:"name"`
 	ResourceName       string    `json:"resource_name"`
@@ -63,7 +64,7 @@ func (s *SupabaseStore) GetGithubServices(projectId, userId string) ([]GithubSer
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConnectionId, repo, repoId, rootDir string, domain *string, port int32) (GithubServicesTable, error) {
+func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConnectionId, repo string, repoId int64, rootDir string, domain *string, port int32) (GithubServicesTable, error) {
 	result := s.cli.Rpc("create_github_service", "", map[string]interface{}{
 		"p_project_id":           projectId,
 		"p_github_connection_id": githubConnectionId,
@@ -111,10 +112,10 @@ func (s *SupabaseStore) UpdateGithubService(id, userId, name string, domain *str
 	return res, nil
 }
 
-func (s *SupabaseStore) GetGithubServicesByRepoId(repoId string) ([]GithubServicesTable, error) {
+func (s *SupabaseStore) GetGithubServicesByRepoId(repoId int64) ([]GithubServicesTable, error) {
 	res, _, err := s.cli.From("github_services").
 		Select("*", "exact", false).
-		Eq("repo_id", repoId).
+		Eq("repo_id", strconv.FormatInt(repoId, 10)).
 		Execute()
 	if err != nil {
 		return nil, err

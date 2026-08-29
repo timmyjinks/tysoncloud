@@ -1,35 +1,16 @@
 package server
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/util"
 )
-
-func verifyWebhookSignature(secret, signature string, body []byte) bool {
-	if secret == "" {
-		return true // skip if not configured (local dev)
-	}
-	if signature == "" {
-		return false
-	}
-	// signature is "sha256=<hex>"
-	hexSig := strings.TrimPrefix(signature, "sha256=")
-	expectedMAC := hmac.New(sha256.New, []byte(secret))
-	expectedMAC.Write(body)
-	expected := hex.EncodeToString(expectedMAC.Sum(nil))
-	return hmac.Equal([]byte(expected), []byte(hexSig))
-}
 
 func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 	eventType := r.Header.Get("X-GitHub-Event")
@@ -37,7 +18,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		eventType = r.Header.Get("X-Github-Event")
 	}
 
-	// Read body for signature verification and payload parsing
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 2<<20))
 	if err != nil {
 		http.Error(w, "could not read body", http.StatusBadRequest)
@@ -45,9 +25,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	// HMAC verify if secret set (env GITHUB_WEBHOOK_SECRET)
-	secret := app.Config.Server.GithubWebhookSecret
-	if !verifyWebhookSignature(secret, r.Header.Get("X-Hub-Signature-256"), body) {
+	if !app.Github.VerifyWebhookSignature(r.Header.Get("X-Hub-Signature-256"), body) {
 		http.Error(w, "invalid signature", http.StatusUnauthorized)
 		return
 	}
@@ -86,7 +64,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		repoId := strconv.FormatInt(payload.Repository.Id, 10)
+		repoId := payload.Repository.Id
 		installationId := ""
 		if payload.Installation.Id != 0 {
 			installationId = strconv.FormatInt(payload.Installation.Id, 10)
@@ -104,7 +82,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Authz: verify installation_id matches github_connections.InstallationId for each service
 		var connectionInstallationId string
 		if installationId != "" {
 			conn, err := app.Supabase.GetGithubConnectionByInstallationId(installationId)
@@ -113,8 +90,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "unknown installation", http.StatusForbidden)
 				return
 			}
-			connectionInstallationId = conn.InstallationId
-			// Verify at least one service belongs to this installation; otherwise authz fail
+			connectionInstallationId = strconv.FormatInt(conn.InstallationId, 10)
 			authorized := false
 			for _, svc := range services {
 				if svc.GithubConnectionId == conn.Id {
@@ -135,19 +111,14 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		if cloneURL == "" && payload.Repository.FullName != "" {
 			cloneURL = fmt.Sprintf("https://github.com/%s.git", payload.Repository.FullName)
 		}
-		// Get token for private repos if installation present
 		accessToken := ""
 		if installationId != "" {
-			accessToken, _ = app.getInstallationToken(r.Context(), installationId)
-			_ = connectionInstallationId // to avoid unused if not used above
+			accessToken, _ = app.Github.GetInstallationToken(r.Context(), installationId)
+			_ = connectionInstallationId
 		}
 
-		// For each service, clone using its stored RootDir and redeploy
-		// Run sequentially for local registry; for scale, use goroutines + WaitGroup.
 		for _, svc := range services {
-			// Double-check per-service authz if we have installation info
 			if installationId != "" && connectionInstallationId != "" {
-				// svc already verified belongs to this installation via above; but skip if not
 				conn, _ := app.Supabase.GetGithubConnectionByInstallationId(installationId)
 				if svc.GithubConnectionId != conn.Id {
 					slog.Warn("skipping service not belonging to installation", "service_id", svc.Id, "installation_id", installationId)
@@ -165,7 +136,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				imageTag = fmt.Sprintf("local/%s:latest", svc.ResourceName)
 			}
 
-			builtImage, err := cloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag)
+			builtImage, err := app.Github.CloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag)
 			if err != nil {
 				slog.Error("webhook: build failed", "service_id", svc.Id, "root_dir", sanitizedRootDir, "err", err)
 				if _, statusErr := app.Supabase.UpdateGithubServiceStatusById(svc.Id, "failed"); statusErr != nil {
@@ -177,7 +148,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				builtImage = imageTag
 			}
 
-			// Preserve existing env on webhook redeploys (stored as k8s Secret).
 			existingEnvStr, _ := app.Deploy.GetServiceEnv(r.Context(), deploy.Service{
 				Namespace: "proj-" + svc.ProjectId,
 				Name:      svc.ResourceName,
@@ -227,8 +197,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 		switch payload.Action {
 		case "created":
-			// Webhook alone has no user_id; frontend should call POST /github/connections after install.
-			// Here we just log; if you want to auto-create, need user mapping via state.
 			slog.Info("github installation created", "installation_id", installationId)
 		case "deleted":
 			if err := app.Supabase.DeleteGithubConnectionByInstallationId(installationId); err != nil {

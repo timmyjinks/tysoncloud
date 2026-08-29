@@ -101,7 +101,7 @@ type GithubServiceResponse struct {
 	ProjectId      string            `json:"project_id"`
 	Name           string            `json:"name"`
 	Repo           string            `json:"repo"`
-	RepoId         string            `json:"repo_id"`
+	RepoId         int64             `json:"repo_id"`
 	RootDir        string            `json:"root_dir"`
 	Port           int32             `json:"port"`
 	Status         string            `json:"status"`
@@ -114,7 +114,7 @@ type GithubServiceResponse struct {
 type GithubServiceCreateRequest struct {
 	Name    string  `json:"name"`
 	Repo    string  `json:"repo"`
-	RepoId  string  `json:"repo_id"`
+	RepoId  int64   `json:"repo_id"`
 	Port    int32   `json:"port"`
 	Domain  *string `json:"domain"`
 	RootDir string  `json:"root_dir"`
@@ -143,6 +143,17 @@ type ProjectCreateRequest struct {
 
 type ProjectUpdateRequest struct {
 	Name *string `json:"name,omitempty"`
+}
+
+type GithubConnectionResponse struct {
+	Id             string    `json:"id"`
+	UserId         string    `json:"user_id"`
+	InstallationId int64     `json:"installation_id"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type GithubConnectionCreateRequest struct {
+	InstallationId int64 `json:"installation_id"`
 }
 
 type ProjectConfigRequest struct {

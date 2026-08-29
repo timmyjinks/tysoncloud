@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
@@ -27,7 +28,6 @@ func (app *Application) GithubRepos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify user owns this installation
 	conn, err := app.Supabase.GetGithubConnectionByInstallationId(installationId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "We couldn't find that GitHub installation.", err)
@@ -38,11 +38,15 @@ func (app *Application) GithubRepos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NOTE: In production, exchange installationId for an installation access token via GitHub App JWT.
-	// For local dev, attempt to fetch token; fallback returns 501 if not configured.
-	token, err := app.getInstallationToken(r.Context(), installationId)
+	token, err := app.Github.GetInstallationToken(r.Context(), installationId)
 	if err != nil {
+		slog.Error("GetInstallationToken failed", "installation_id", installationId, "err", err)
 		writeError(w, http.StatusInternalServerError, "GitHub installation token not configured.", err)
+		return
+	}
+	if token == "" {
+		slog.Error("GetInstallationToken empty", "installation_id", installationId)
+		writeError(w, http.StatusInternalServerError, "GitHub App not configured.", nil)
 		return
 	}
 
@@ -53,13 +57,21 @@ func (app *Application) GithubRepos(w http.ResponseWriter, r *http.Request) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		slog.Error("GitHub repos request failed", "installation_id", installationId, "err", err)
 		writeError(w, http.StatusBadGateway, "Couldn't reach GitHub.", err)
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized {
+		body, _ := io.ReadAll(resp.Body)
+		slog.Error("GitHub Bad credentials", "installation_id", installationId, "app_id", app.Config.Github.AppID, "status", resp.StatusCode, "body", string(body))
+		writeError(w, http.StatusBadGateway, "GitHub Bad credentials - check GITHUB_APP_ID/PRIVATE_KEY and that installation 157404346 belongs to app tysoncloud", nil)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
@@ -170,7 +182,7 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "Repository is required.", nil)
 		return
 	}
-	if req.RepoId == "" {
+	if req.RepoId == 0 {
 		writeError(w, http.StatusBadRequest, "Repository ID is required.", nil)
 		return
 	}
@@ -223,16 +235,13 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Build image using railpack with RootDir as build context.
-	// Clone URL derived from repo (owner/repo). For private repos, inject installation token.
 	cloneURL := fmt.Sprintf("https://github.com/%s.git", req.Repo)
-	accessToken, _ := app.getInstallationToken(r.Context(), connection.InstallationId)
+	accessToken, _ := app.Github.GetInstallationToken(r.Context(), strconv.FormatInt(connection.InstallationId, 10))
 	imageTag := fmt.Sprintf("local/%s:latest", res.ResourceName)
 
 	builtImage := ""
-	if image, err := cloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag); err != nil {
+	if image, err := app.Github.CloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag); err != nil {
 		slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "err", err)
-		// Mark failed but keep DB record; user can retry via webhook or update.
 		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
 			slog.Error("failed to mark github service failed after build error", "service_id", res.Id, "err", statusErr)
 		}
@@ -355,7 +364,6 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	if req.Env != nil {
 		envStr = *req.Env
 	}
-	// Re-deploy with existing image (or rebuilt image if desired). For now reuse current deploy.
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,

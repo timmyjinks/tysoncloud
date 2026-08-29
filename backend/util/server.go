@@ -25,9 +25,6 @@ func ValidateDomainLabel(label string) (bool, error) {
 	return domainLabelRegex.MatchString(label), nil
 }
 
-// NormalizeDomain extracts the subdomain fragment from a user-supplied domain.
-// Frontend sends just the fragment ("ohyah"), but we also accept full forms like
-// "tc-ohyah.tysonjenkins.dev" or "ohyah.domain.com" and extract "ohyah".
 func NormalizeDomain(raw string) string {
 	v := strings.TrimSpace(strings.ToLower(raw))
 	if v == "" {
@@ -76,7 +73,6 @@ func SanitizeRootDir(raw string) (string, error) {
 		return ".", nil
 	}
 	clean := strings.ReplaceAll(v, "\\", "/")
-	// Prevent traversal
 	if strings.HasPrefix(clean, "/") {
 		return "", fmt.Errorf("root_dir must be relative, got %q", raw)
 	}
@@ -86,7 +82,6 @@ func SanitizeRootDir(raw string) (string, error) {
 			return "", fmt.Errorf("root_dir must not contain '..', got %q", raw)
 		}
 	}
-	// normalize ./ and trailing /
 	out := strings.Join(parts, "/")
 	if out == "" || out == "." {
 		return ".", nil

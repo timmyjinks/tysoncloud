@@ -233,6 +233,10 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 			writeError(w, http.StatusBadRequest, domainValidationMessage(err), err)
 			return
 		}
+		if isDuplicateKeyError(err) {
+			writeError(w, http.StatusConflict, "That name is already taken. Please choose a different one.", err)
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "Couldn't create the service.", err)
 		return
 	}
@@ -362,6 +366,10 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 		}
 		if domainRequested && isDomainValidationError(err) {
 			writeError(w, http.StatusBadRequest, domainValidationMessage(err), err)
+			return
+		}
+		if isDuplicateKeyError(err) {
+			writeError(w, http.StatusConflict, "That name is already taken. Please choose a different one.", err)
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "Couldn't save the service.", err)

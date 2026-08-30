@@ -41,6 +41,7 @@ const STATUS_FALLBACK_MESSAGES: Record<number, string> = {
   401: "Your session has expired. Please sign in again.",
   403: "You don't have permission to do that.",
   404: "We couldn't find what you were looking for.",
+  409: "That name is already taken. Please choose a different one.",
   429: "You're moving a little fast — wait a moment and try again.",
 };
 
@@ -101,6 +102,14 @@ async function request<T>(
           message = body?.error ?? body?.message ?? null;
         } catch {
           body = null;
+        }
+      } else if (contentType.includes("text/html")) {
+        if (text.includes("Service unavailable") || text.includes("isn't reachable")) {
+          message = "This service isn't reachable right now. It may still be starting up — wait a moment and try again.";
+        } else {
+          const title = text.match(/<title>(.*?)<\/title>/i)?.[1]?.trim();
+          const h1 = text.match(/<h1[^>]*>(.*?)<\/h1>/i)?.[1]?.trim();
+          message = (h1 || title || text).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || null;
         }
       } else if (contentType.includes("text/plain")) {
         message = text.trim().slice(0, 300) || null;

@@ -57,6 +57,12 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            - name: REGISTRY_URL
+              value: registry.tc-system.svc.cluster.local:5000
+            - name: BUILDKIT_HOST
+              value: tcp://localhost:1234
+            - name: REGISTRY_INSECURE
+              value: "true"
             - name: ALLOWED_ORIGINS
               valueFrom:
                 secretKeyRef:
@@ -102,3 +108,28 @@ spec:
                 secretKeyRef:
                   key: CLOUDFLARE_ZONE_ID
                   name: tysoncloud-backend
+        - name: buildkitd
+          image: moby/buildkit:latest
+          args:
+            - --addr
+            - tcp://0.0.0.0:1234
+            - --addr
+            - unix:///run/buildkit/buildkitd.sock
+          ports:
+            - containerPort: 1234
+              name: buildkit
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: 1234
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi

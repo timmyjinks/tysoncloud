@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -13,6 +12,7 @@ type Config struct {
 	Server     Server
 	Supabase   Supabase
 	Github     Github
+	Registry   Registry
 	KubeConfig string `env:"KUBECONFIG"`
 }
 
@@ -31,15 +31,19 @@ type Github struct {
 	InstallationToken string `env:"GITHUB_INSTALLATION_TOKEN"`
 }
 
+type Registry struct {
+	URL string `env:"REGISTRY_URL"`
+}
+
 type Supabase struct {
 	ProjectURL string `env:"SUPABASE_URL"`
 	APIKey     string `env:"SUPABASE_API_KEY"`
 }
 
 func Load() (Config, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println(err)
+	// Try repo root .env, then backend/.env, ignore missing
+	if err := godotenv.Load(); err != nil {
+		_ = godotenv.Load("backend/.env")
 	}
 
 	return Config{
@@ -59,6 +63,9 @@ func Load() (Config, error) {
 			AppID:             getString("GITHUB_APP_ID", ""),
 			AppPrivateKey:     getString("GITHUB_APP_PRIVATE_KEY", ""),
 			InstallationToken: getString("GITHUB_INSTALLATION_TOKEN", ""),
+		},
+		Registry: Registry{
+			URL: getString("REGISTRY_URL", "registry.tc-system.svc.cluster.local:5000"),
 		},
 		KubeConfig: getString("KUBECONFIG", "~/.kube/config"),
 	}, nil

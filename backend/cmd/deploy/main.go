@@ -32,7 +32,7 @@ func main() {
 
 	deployService := deploy.NewDeployService(kubernetesService)
 
-	githubService := github.NewService(cfg.Github)
+	githubService := github.NewService(cfg.Github, cfg.Registry)
 
 	clerk.SetKey(cfg.Server.ClerkApiKey)
 

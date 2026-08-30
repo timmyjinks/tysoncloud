@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/timmyjinks/tysoncloud/deploy"
+	"github.com/timmyjinks/tysoncloud/github"
 	"github.com/timmyjinks/tysoncloud/util"
 )
 
@@ -131,16 +133,28 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				slog.Error("invalid root_dir stored for service, skipping deploy", "service_id", svc.Id, "root_dir", svc.RootDir, "err", err)
 				continue
 			}
-			imageTag := fmt.Sprintf("local/%s:%s", svc.ResourceName, payload.HeadCommitID)
-			if payload.HeadCommitID == "" {
-				imageTag = fmt.Sprintf("local/%s:latest", svc.ResourceName)
+			registryURLHook := app.Github.RegistryURL()
+			tag := payload.HeadCommitID
+			if tag == "" {
+				tag = "latest"
+			} else if len(tag) > 12 {
+				tag = tag[:12]
 			}
+			imageTag := app.Github.RegistryTag(registryURLHook, svc.ResourceName, tag)
 
 			builtImage, err := app.Github.CloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag)
 			if err != nil {
-				slog.Error("webhook: build failed", "service_id", svc.Id, "root_dir", sanitizedRootDir, "err", err)
+				if github.IsInfraBuildError(err) {
+					slog.Error("webhook: build failed due to infra unavailable – will retry on next push", "service_id", svc.Id, "root_dir", sanitizedRootDir, "err", err, "hint", "ensure BuildKit is running: docker compose up -d buildkit registry or BUILDKIT_HOST=docker-container://buildkit")
+				} else {
+					slog.Error("webhook: build failed", "service_id", svc.Id, "root_dir", sanitizedRootDir, "err", err)
+				}
 				if _, statusErr := app.Supabase.UpdateGithubServiceStatusById(svc.Id, "failed"); statusErr != nil {
 					slog.Error("failed to mark service failed after webhook build error", "service_id", svc.Id, "err", statusErr)
+				}
+				// Log infra vs user error distinctly for ops
+				if strings.Contains(strings.ToLower(err.Error()), "root_dir") {
+					slog.Warn("webhook: root_dir not found, check repo path", "service_id", svc.Id, "root_dir", sanitizedRootDir)
 				}
 				continue
 			}

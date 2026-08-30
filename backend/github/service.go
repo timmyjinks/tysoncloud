@@ -23,10 +23,59 @@ import (
 
 type Service struct {
 	cfg config.Github
+	reg config.Registry
 }
 
-func NewService(cfg config.Github) *Service {
-	return &Service{cfg: cfg}
+func NewService(cfg config.Github, reg config.Registry) *Service {
+	return &Service{cfg: cfg, reg: reg}
+}
+
+func (s *Service) RegistryURL() string {
+	if s.reg.URL != "" {
+		return s.reg.URL
+	}
+	if v := os.Getenv("REGISTRY_URL"); v != "" {
+		return v
+	}
+	return "10.43.41.193:5000"
+}
+
+func RegistryTag(registryURL, resourceName, tag string) string {
+	if tag == "" {
+		tag = "latest"
+	}
+	registryURL = strings.TrimSuffix(strings.TrimSpace(registryURL), "/")
+	resourceName = strings.TrimSpace(resourceName)
+	if registryURL == "" {
+		return fmt.Sprintf("local/%s:%s", resourceName, tag)
+	}
+	return fmt.Sprintf("%s/%s:%s", registryURL, resourceName, tag)
+}
+
+func (s *Service) RegistryTag(registryURL, resourceName, tag string) string {
+	return RegistryTag(registryURL, resourceName, tag)
+}
+
+func IsInfraBuildError(err error) bool {
+	return isInfraBuildError(err)
+}
+
+func isInfraBuildError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	infraMarkers := []string{
+		"buildkit_host", "buildkit host", "buildkit", "buildctl",
+		"cannot connect to the docker daemon", "docker daemon", "is the docker daemon running",
+		"no buildkit builder available", "registry.insecure", "connection refused", "no such host",
+	}
+	for _, m := range infraMarkers {
+		if strings.Contains(msg, m) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) GetInstallationToken(ctx context.Context, installationId string) (string, error) {
@@ -170,21 +219,32 @@ func buildImageWithRailpack(ctx context.Context, buildContext, imageTag string) 
 		imageTag = "local/app:latest"
 	}
 
-	if _, err := exec.LookPath("railpack"); err == nil {
-		cmd := exec.CommandContext(ctx, "railpack", "build", "--context", buildContext, "--tag", imageTag)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			slog.Error("railpack build failed, falling back to docker build", "err", err, "output", string(out))
-		} else {
-			return imageTag, nil
-		}
+	planDir, err := os.MkdirTemp("", "railpack-plan-*")
+	if err != nil {
+		return "", fmt.Errorf("create plan dir: %w", err)
+	}
+	defer os.RemoveAll(planDir)
+	planPath := filepath.Join(planDir, "railpack-plan.json")
+
+	prepCmd := exec.CommandContext(ctx, "railpack", "prepare", buildContext, "--plan-out", planPath)
+	prepCmd.Env = os.Environ()
+	if out, err := prepCmd.CombinedOutput(); err != nil {
+		slog.Error("railpack prepare failed", "err", err, "output", string(out))
+		return "", fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
-	cmd := exec.CommandContext(ctx, "docker", "build", "-t", imageTag, buildContext)
-	out, err := cmd.CombinedOutput()
+	buildCmd := exec.CommandContext(ctx, "buildctl", "build",
+		"--local", "context="+buildContext,
+		"--local", "dockerfile="+planDir,
+		"--frontend=gateway.v0",
+		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest", // pin version, see note below
+		"--output", fmt.Sprintf("type=image,name=%s,push=true,registry.insecure=true", imageTag),
+	)
+	buildCmd.Env = os.Environ()
+	out, err := buildCmd.CombinedOutput()
 	if err != nil {
-		slog.Error("docker build failed", "err", err, "output", string(out))
-		return "", fmt.Errorf("image build failed: %w", err)
+		slog.Error("buildctl build failed", "err", err, "output", string(out))
+		return "", fmt.Errorf("buildctl build failed: %w", err)
 	}
 	return imageTag, nil
 }

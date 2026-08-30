@@ -237,6 +237,10 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadRequest, domainValidationMessage(err), err)
 			return
 		}
+		if isDuplicateKeyError(err) {
+			writeError(w, http.StatusConflict, "That name is already taken. Please choose a different one.", err)
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "Couldn't create the service.", err)
 		return
 	}
@@ -336,6 +340,10 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 		}
 		if domainRequested && isDomainValidationError(err) {
 			writeError(w, http.StatusBadRequest, domainValidationMessage(err), err)
+			return
+		}
+		if isDuplicateKeyError(err) {
+			writeError(w, http.StatusConflict, "That name is already taken. Please choose a different one.", err)
 			return
 		}
 		writeError(w, http.StatusInternalServerError, "Couldn't save the service.", err)

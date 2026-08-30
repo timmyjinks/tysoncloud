@@ -7,6 +7,7 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	appmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
@@ -54,5 +55,9 @@ func (d *KubernetesService) CreateHPA(ctx context.Context, resource Resource) er
 }
 
 func (d *KubernetesService) DeleteHPA(ctx context.Context, resource Resource) error {
-	return d.clientset.AutoscalingV1().HorizontalPodAutoscalers(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
+	err := d.clientset.AutoscalingV2().HorizontalPodAutoscalers(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }

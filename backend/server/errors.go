@@ -6,10 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/timmyjinks/tysoncloud/store"
 )
 
 type Issue struct {
@@ -26,6 +22,9 @@ func writeError(w http.ResponseWriter, status int, publicMessage string, interna
 	if internal != nil {
 		slog.Error(publicMessage, "status", status, "err", internal)
 	}
+	// For 5xx failures the caller only knows the generic story ("couldn't
+	// create the service"). Surface the underlying reason too, so the user
+	// isn't stuck with "please try again" and no idea why it failed.
 	if status >= http.StatusInternalServerError {
 		publicMessage = withCause(publicMessage, internal)
 	}
@@ -45,58 +44,60 @@ func writeIssuesError(w http.ResponseWriter, status int, publicMessage string, i
 
 var invalidPort error = errors.New("no port found for engine")
 
-func getErrorMessage(internal error) string {
-	var apiStatus apierrors.APIStatus
-	if errors.As(internal, &apiStatus) {
-		status := apiStatus.Status()
-		switch {
-		case apierrors.IsAlreadyExists(internal):
-			return "That name is already taken. Please choose a different one."
-		case apierrors.IsForbidden(internal), apierrors.IsUnauthorized(internal):
-			return "You don't currently have permission to do this."
-		case apierrors.IsInvalid(internal):
-			return "One of the provided values isn't allowed. Please review and try again."
-		case apierrors.IsTimeout(internal), apierrors.IsServerTimeout(internal), apierrors.IsTooManyRequests(internal), apierrors.IsServiceUnavailable(internal):
-			return "We're experiencing high demand right now. Please try again in a moment."
-		case strings.Contains(strings.ToLower(status.Message), "quota"):
-			return "There isn't enough capacity for this right now. Please try again shortly."
-		}
-	}
-
-	msg := strings.ToLower(strings.TrimSpace(internal.Error()))
-	for _, prefix := range []string{"dial tcp", "dial udp", "connection refused", "connection reset", "i/o timeout", "no such host", "network is unreachable", "lookup "} {
-		if strings.HasPrefix(msg, prefix) {
-			return "A connection problem occurred. Please try again in a moment."
-		}
-	}
-
-	return ""
+// unusableCauses are internal errors that carry no user-actionable meaning.
+var unusableCauses = []string{
+	"context canceled",
+	"context deadline exceeded",
+	"json: ",
+	"http: ",
 }
 
+// extractCause pulls a concise, user-facing reason out of an internal error,
+// returning "" when there's nothing safe or useful to surface.
 func extractCause(internal error) string {
 	if internal == nil {
 		return ""
 	}
-	if message := getErrorMessage(internal); message != "" {
-		return message
+	msg := strings.TrimSpace(internal.Error())
+	if msg == "" {
+		return ""
 	}
 
-	msg := strings.TrimSpace(internal.Error())
+	// The store layer wraps RPC failures as "<op> failed: <detail>" —
+	// surface the detail, not the wrapper.
 	if i := strings.Index(msg, "failed: "); i >= 0 {
 		msg = strings.TrimSpace(msg[i+len("failed: "):])
 	}
 	if msg == "" {
 		return ""
 	}
-	if message := getErrorMessage(errors.New(msg)); message != "" {
-		return message
+
+	for _, prefix := range unusableCauses {
+		if strings.HasPrefix(msg, prefix) {
+			return ""
+		}
 	}
-	if message, ok := store.GetPostgresErrorMessage(msg); ok {
-		return message
+	// URLs point at internal endpoints (Supabase/k8s) — don't leak them.
+	if strings.Contains(msg, "://") {
+		return ""
 	}
-	return ""
+
+	// Collapse to the first line and cap the length so an API/library
+	// doesn't dump a wall of text into the UI.
+	if i := strings.IndexByte(msg, '\n'); i >= 0 {
+		msg = msg[:i]
+	}
+	if len(msg) > 200 {
+		msg = msg[:200]
+	}
+	msg = strings.TrimRight(msg, " \t.")
+
+	return msg
 }
 
+// withCause appends the underlying cause to a public message when one can be
+// safely extracted, so users see why an action failed instead of a bare
+// "try again".
 func withCause(publicMessage string, internal error) string {
 	if cause := extractCause(internal); cause != "" {
 		return publicMessage + " " + cause
@@ -105,9 +106,9 @@ func withCause(publicMessage string, internal error) string {
 }
 
 const (
-	msgUnauthorized = "Your session has expired. Please sign in again."
-	msgServerError  = "Something unexpected went wrong while completing your request."
-	msgBadRequest   = "That request wasn't valid. Please check it and try again."
+	msgUnauthorized = "Please sign in again."
+	msgServerError  = "Something went wrong on our end. Please try again."
+	msgBadRequest   = "That request wasn't valid."
 )
 
 func isDomainTakenError(err error) bool {
@@ -134,3 +135,9 @@ func domainValidationMessage(err error) string {
 	return "Custom domain must be 1-63 characters, lowercase letters, numbers, and hyphens only, and cannot start or end with a hyphen."
 }
 
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "duplicate key value")
+}

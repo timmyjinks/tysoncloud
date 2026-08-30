@@ -57,20 +57,19 @@ func (d *DeployService) DeleteService(ctx context.Context, service Service) erro
 		return err
 	}
 
-	if err := d.svc.DeleteHPA(ctx, ServiceToResource(service)); err != nil {
+	if err := d.svc.DeleteHPA(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	if err := d.svc.DeleteDeployment(ctx, ServiceToResource(service)); err != nil {
+	if err := d.svc.DeleteDeployment(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	err := d.svc.DeleteService(ctx, ServiceToResource(service))
-	if err != nil {
+	if err := d.svc.DeleteService(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
-	if err := d.svc.DeleteHTTPRoute(ctx, ServiceToResource(service)); err != nil {
+	if err := d.svc.DeleteHTTPRoute(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 

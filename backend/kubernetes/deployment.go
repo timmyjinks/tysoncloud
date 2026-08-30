@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/timmyjinks/tysoncloud/util"
 	corev1 "k8s.io/api/core/v1"
@@ -16,10 +17,15 @@ import (
 )
 
 func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resource) error {
+	pullPolicy := corev1.PullIfNotPresent
+	if strings.HasSuffix(resource.Image, ":latest") {
+		pullPolicy = corev1.PullAlways
+	}
 	container := []appcorev1.ContainerApplyConfiguration{
 		{
-			Name:  &resource.Name,
-			Image: &resource.Image,
+			Name:            &resource.Name,
+			Image:           &resource.Image,
+			ImagePullPolicy: &pullPolicy,
 			Resources: &appcorev1.ResourceRequirementsApplyConfiguration{
 				Limits: &corev1.ResourceList{
 					corev1.ResourceCPU:    resourcev1.MustParse("500m"),

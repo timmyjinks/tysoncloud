@@ -92,11 +92,11 @@ func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConne
 
 func (s *SupabaseStore) UpdateGithubService(id, userId, name string, domain *string, port int32) (GithubServicesTable, error) {
 	result := s.cli.Rpc("update_github_service", "", map[string]interface{}{
-		"p_id":      id,
-		"p_user_id": userId,
-		"p_name":    name,
-		"p_port":    port,
-		"p_domain":  domain,
+		"p_id":            id,
+		"p_user_id":       userId,
+		"p_name":          name,
+		"p_port":          port,
+		"p_public_domain": domain,
 	})
 
 	var pgErr PostgrestError
@@ -138,6 +138,11 @@ func (s *SupabaseStore) UpdateGithubServiceStatus(id, userId, status string) (Gi
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		// Graceful fallback: if the RPC is missing (schema cache), try the by-id variant
+		// so builds don't 500 on missing function `update_github_service_status`.
+		if isMissingFunctionError(pgErr) {
+			return s.UpdateGithubServiceStatusById(id, status)
+		}
 		return GithubServicesTable{}, rpcError("update_github_service_status", pgErr)
 	}
 
@@ -149,6 +154,22 @@ func (s *SupabaseStore) UpdateGithubServiceStatus(id, userId, status string) (Gi
 	return res, nil
 }
 
+func isMissingFunctionError(pgErr PostgrestError) bool {
+	msg := pgErr.Message
+	return contains(msg, "Could not find the function") || contains(msg, "schema cache")
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (func() bool {
+		for i := 0; i <= len(s)-len(substr); i++ {
+			if s[i:i+len(substr)] == substr {
+				return true
+			}
+		}
+		return false
+	})()
+}
+
 func (s *SupabaseStore) UpdateGithubServiceStatusById(id, status string) (GithubServicesTable, error) {
 	result := s.cli.Rpc("update_github_service_status_by_id", "", map[string]interface{}{
 		"p_id":     id,
@@ -157,6 +178,10 @@ func (s *SupabaseStore) UpdateGithubServiceStatusById(id, status string) (Github
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
+		if isMissingFunctionError(pgErr) {
+			// Fallback to direct table update when RPC is missing (schema cache).
+			return s.updateGithubServiceStatusDirect(id, status)
+		}
 		return GithubServicesTable{}, rpcError("update_github_service_status_by_id", pgErr)
 	}
 
@@ -166,6 +191,26 @@ func (s *SupabaseStore) UpdateGithubServiceStatusById(id, status string) (Github
 	}
 
 	return res, nil
+}
+
+func (s *SupabaseStore) updateGithubServiceStatusDirect(id, status string) (GithubServicesTable, error) {
+	res, _, err := s.cli.From("github_services").
+		Update(map[string]interface{}{"status": status}, "", "").
+		Eq("id", id).
+		Execute()
+	if err != nil {
+		return GithubServicesTable{}, err
+	}
+	// Supabase may return array with one element
+	var arr []GithubServicesTable
+	if err := json.Unmarshal(res, &arr); err == nil && len(arr) == 1 {
+		return arr[0], nil
+	}
+	var single GithubServicesTable
+	if err := json.Unmarshal(res, &single); err != nil {
+		return GithubServicesTable{}, err
+	}
+	return single, nil
 }
 
 func (s *SupabaseStore) DeleteGithubService(id, userId string) error {

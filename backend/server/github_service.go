@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
@@ -235,48 +237,8 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cloneURL := fmt.Sprintf("https://github.com/%s.git", req.Repo)
-	accessToken, _ := app.Github.GetInstallationToken(r.Context(), strconv.FormatInt(connection.InstallationId, 10))
-	imageTag := fmt.Sprintf("local/%s:latest", res.ResourceName)
-
-	builtImage := ""
-	if image, err := app.Github.CloneAndBuild(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag); err != nil {
-		slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "err", err)
-		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
-			slog.Error("failed to mark github service failed after build error", "service_id", res.Id, "err", statusErr)
-		}
-		writeError(w, http.StatusInternalServerError, "Your service was created, but we couldn't build its image. Check the root directory and try again.", err)
-		return
-	} else {
-		builtImage = image
-	}
-
-	if builtImage == "" {
-		builtImage = imageTag
-	}
-
-	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
-		Namespace: "proj-" + res.ProjectId,
-		Name:      res.ResourceName,
-		Hostname:  res.PublicDomain,
-		Env:       util.ParseEnv(req.Env),
-		Port:      req.Port,
-		Image:     builtImage,
-	}); err != nil {
-		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
-			slog.Error("failed to mark github service failed after deploy error", "service_id", res.Id, "err", statusErr)
-		}
-		writeError(w, http.StatusInternalServerError, "Your service was created, but we couldn't start it. A refresh will show its current status.", err)
-		return
-	}
-
-	if _, err := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "running"); err != nil {
-		writeError(w, http.StatusInternalServerError, "Your service was started, but we couldn't confirm its status. A refresh will show where things stand.", err)
-		return
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(http.StatusAccepted)
 	_ = json.NewEncoder(w).Encode(GithubServiceResponse{
 		Id:             res.Id,
 		ProjectId:      res.ProjectId,
@@ -285,11 +247,57 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		RepoId:         res.RepoId,
 		RootDir:        res.RootDir,
 		Port:           res.Port,
-		Status:         "running",
+		Status:         res.Status,
 		PublicDomain:   res.PublicDomain,
 		InternalDomain: res.PrivateDomain,
 		CreatedAt:      res.CreatedAt,
 	})
+
+	go func() {
+		buildCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+
+		cloneURL := fmt.Sprintf("https://github.com/%s.git", req.Repo)
+		accessToken, err := app.Github.GetInstallationToken(buildCtx, strconv.FormatInt(connection.InstallationId, 10))
+		if err != nil {
+			slog.Error("failed to get installation token", "service_id", res.Id, "err", err)
+			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
+				slog.Error("failed to mark github service failed after token error", "service_id", res.Id, "err", statusErr)
+			}
+			return
+		}
+
+		registryURL := app.Github.RegistryURL()
+		imageTag := app.Github.RegistryTag(registryURL, res.ResourceName, "latest")
+
+		image, err := app.Github.CloneAndBuild(buildCtx, cloneURL, accessToken, sanitizedRootDir, imageTag)
+		if err != nil {
+			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "err", err)
+			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
+				slog.Error("failed to mark github service failed after build error", "service_id", res.Id, "err", statusErr)
+			}
+			return
+		}
+
+		if err := app.Deploy.CreateService(buildCtx, deploy.Service{
+			Namespace: "proj-" + res.ProjectId,
+			Name:      res.ResourceName,
+			Hostname:  res.PublicDomain,
+			Env:       util.ParseEnv(req.Env),
+			Port:      req.Port,
+			Image:     image,
+		}); err != nil {
+			slog.Error("failed to deploy github service", "service_id", res.Id, "err", err)
+			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
+				slog.Error("failed to mark github service failed after deploy error", "service_id", res.Id, "err", statusErr)
+			}
+			return
+		}
+
+		if _, err := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "running"); err != nil {
+			slog.Error("failed to mark github service running after successful deploy", "service_id", res.Id, "err", err)
+		}
+	}()
 }
 
 func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Request) {
@@ -364,12 +372,17 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	if req.Env != nil {
 		envStr = *req.Env
 	}
+	// For updates we keep the current deployed image (registry tag). The image is managed by
+	// CreateGithubService (latest) and webhook pushes (per-commit SHA). Update only restarts
+	// with new env/domain/port, not a rebuild.
+	registryURLUpdate := app.Github.RegistryURL()
+	fallbackImage := app.Github.RegistryTag(registryURLUpdate, res.ResourceName, "latest")
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
 		Name:      res.ResourceName,
 		Hostname:  res.PublicDomain,
 		Env:       util.ParseEnv(envStr),
-		Image:     fmt.Sprintf("local/%s:latest", res.ResourceName),
+		Image:     fallbackImage,
 		Port:      *req.Port,
 	}); err != nil {
 		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
@@ -423,9 +436,14 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Resolve actual k8s resource name if possible; fallback to svc-<id> convention on lookup failure.
+	resourceName := "svc-" + githubServiceId
+	if svc, err := app.Supabase.GetGithubServiceById(githubServiceId); err == nil && svc.ResourceName != "" {
+		resourceName = svc.ResourceName
+	}
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
-		Name:      "svc-" + githubServiceId,
+		Name:      resourceName,
 	}); err != nil {
 		slog.Error("failed to clean up github service infrastructure", "service_id", githubServiceId, "err", err)
 	}
@@ -464,9 +482,13 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 			failed = append(failed, FailedDelete{Id: id, Error: "Couldn't delete the service."})
 			continue
 		}
+		resourceName := "svc-" + id
+		if svc, err := app.Supabase.GetGithubServiceById(id); err == nil && svc.ResourceName != "" {
+			resourceName = svc.ResourceName
+		}
 		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 			Namespace: "proj-" + projectId,
-			Name:      "svc-" + id,
+			Name:      resourceName,
 		}); err != nil {
 			slog.Error("failed to clean up github service infrastructure", "service_id", id, "err", err)
 		}

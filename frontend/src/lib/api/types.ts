@@ -96,7 +96,7 @@ export type GithubService = {
   id: string;
   project_id: string;
   name: string;
-  repo: string;
+  repo_name: string;
   repo_id: number;
   root_dir: string;
   port: number;

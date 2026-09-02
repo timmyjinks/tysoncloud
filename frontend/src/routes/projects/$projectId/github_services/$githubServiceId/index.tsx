@@ -89,11 +89,10 @@ function GithubServiceDetail() {
             { label: "Service ID", value: service.id, mono: true },
             {
               label: "Repository",
-              value: service.repo,
+              value: service.repo_name,
               mono: true,
-              href: `https://github.com/${service.repo}`,
+              href: `https://github.com/${service.repo_name}`,
             },
-            { label: "Repo ID", value: String(service.repo_id), mono: true },
             { label: "Root directory", value: service.root_dir || ".", mono: true },
             {
               label: "Public domain",

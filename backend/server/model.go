@@ -100,7 +100,7 @@ type GithubServiceResponse struct {
 	Id             string            `json:"id"`
 	ProjectId      string            `json:"project_id"`
 	Name           string            `json:"name"`
-	Repo           string            `json:"repo"`
+	Repo           string            `json:"repo_name"`
 	RepoId         int64             `json:"repo_id"`
 	RootDir        string            `json:"root_dir"`
 	Port           int32             `json:"port"`

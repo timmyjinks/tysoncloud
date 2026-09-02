@@ -20,7 +20,6 @@ type GithubServicesTable struct {
 	PublicDomain       string    `json:"public_domain"`
 	PrivateDomain      string    `json:"private_domain"`
 	Port               int32     `json:"port"`
-	Repo               string    `json:"repo"`
 	RootDir            string    `json:"root_dir"`
 	CreatedAt          time.Time `json:"created_at"`
 }
@@ -72,7 +71,7 @@ func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConne
 		"p_user_id":              userId,
 		"p_repo_name":            repo,
 		"p_name":                 name,
-		"p_repo_root":            rootDir,
+		"p_root_dir":             rootDir,
 		"p_domain":               domain,
 		"p_port":                 port,
 	})

@@ -34,6 +34,7 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/github_services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateGithubService))).Methods("POST")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateGithubService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubService))).Methods("DELETE")
+	r.HandleFunc("/projects/{project_id}/github_services/{github_service_id}/logs", s.GetGithubServiceLogs).Methods("GET")
 
 	r.Handle("/services/{service_id}/volumes", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetVolume))).Methods("GET")
 	r.Handle("/projects/{project_id}/services/{service_id}/volumes", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateVolume))).Methods("POST")

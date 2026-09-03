@@ -8,10 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
+	clerkjwt "github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
 	"github.com/timmyjinks/tysoncloud/util"
@@ -261,10 +264,26 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		buildCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 		defer cancel()
 
+		logFn := func(line string) {
+			app.Github.AppendBuildLog(res.Id, line)
+		}
+		emitState := func(to string) {
+			line := `[state] ` + to + ` service=` + res.Id + ` repo=` + req.Repo + ` root_dir=` + sanitizedRootDir
+			app.Github.AppendBuildLog(res.Id, line)
+			slog.Info("github deploy state", "service_id", res.Id, "to", to, "repo", req.Repo, "root_dir", sanitizedRootDir)
+		}
+
+		emitState("building")
+		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "building"); statusErr != nil {
+			slog.Warn("failed to mark github service building", "service_id", res.Id, "err", statusErr)
+		}
+
 		cloneURL := fmt.Sprintf("https://github.com/%s.git", req.Repo)
 		accessToken, err := app.Github.GetInstallationToken(buildCtx, strconv.FormatInt(connection.InstallationId, 10))
 		if err != nil {
 			slog.Error("failed to get installation token", "service_id", res.Id, "err", err)
+			logFn(`[build] failed to get installation token: ` + err.Error())
+			emitState("failed")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
 				slog.Error("failed to mark github service failed after token error", "service_id", res.Id, "err", statusErr)
 			}
@@ -274,13 +293,20 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		registryURL := app.Github.RegistryURL()
 		imageTag := app.Github.RegistryTag(registryURL, res.ResourceName, "latest")
 
-		image, err := app.Github.CloneAndBuild(buildCtx, cloneURL, accessToken, sanitizedRootDir, imageTag)
+		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, imageTag, logFn)
 		if err != nil {
 			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "err", err)
+			logFn(`[state] building failed: ` + err.Error())
+			emitState("failed")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
 				slog.Error("failed to mark github service failed after build error", "service_id", res.Id, "err", statusErr)
 			}
 			return
+		}
+
+		emitState("deploying")
+		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "deploying"); statusErr != nil {
+			slog.Warn("failed to mark github service deploying", "service_id", res.Id, "err", statusErr)
 		}
 
 		if err := app.Deploy.CreateService(buildCtx, deploy.Service{
@@ -292,15 +318,19 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 			Image:     image,
 		}); err != nil {
 			slog.Error("failed to deploy github service", "service_id", res.Id, "err", err)
+			logFn(`[state] deploying failed: ` + err.Error())
+			emitState("failed")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
 				slog.Error("failed to mark github service failed after deploy error", "service_id", res.Id, "err", statusErr)
 			}
 			return
 		}
 
+		emitState("running")
 		if _, err := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "running"); err != nil {
 			slog.Error("failed to mark github service running after successful deploy", "service_id", res.Id, "err", err)
 		}
+		logFn(`[state] running image=` + image)
 	}()
 }
 
@@ -380,9 +410,6 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	if req.Env != nil {
 		envStr = *req.Env
 	}
-	// For updates we keep the current deployed image (registry tag). The image is managed by
-	// CreateGithubService (latest) and webhook pushes (per-commit SHA). Update only restarts
-	// with new env/domain/port, not a rebuild.
 	registryURLUpdate := app.Github.RegistryURL()
 	fallbackImage := app.Github.RegistryTag(registryURLUpdate, res.ResourceName, "latest")
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
@@ -444,7 +471,6 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Resolve actual k8s resource name if possible; fallback to svc-<id> convention on lookup failure.
 	resourceName := "svc-" + githubServiceId
 	if svc, err := app.Supabase.GetGithubServiceById(githubServiceId); err == nil && svc.ResourceName != "" {
 		resourceName = svc.ResourceName
@@ -507,6 +533,146 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 	if err := json.NewEncoder(w).Encode(BulkDeleteResponse{Deleted: deleted, Failed: failed}); err != nil {
 		writeError(w, http.StatusInternalServerError, msgServerError, err)
 		return
+	}
+}
+
+func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Request) {
+	projectId := mux.Vars(r)["project_id"]
+	if projectId == "" {
+		writeError(w, http.StatusBadRequest, "A project ID is required.", nil)
+		return
+	}
+	githubServiceId := mux.Vars(r)["github_service_id"]
+	if githubServiceId == "" {
+		writeError(w, http.StatusBadRequest, "A service ID is required.", nil)
+		return
+	}
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		cookie, cookieErr := r.Cookie("__session")
+		if cookieErr != nil {
+			writeError(w, http.StatusUnauthorized, msgUnauthorized, cookieErr)
+			return
+		}
+		token = cookie.Value
+	}
+	claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{Token: token})
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, msgUnauthorized, err)
+		return
+	}
+	svc, err := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+	allowedOrigins := parseAllowedOrigins(app.Config.Server.AllowedOrigins)
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			return allowedOrigins[origin]
+		},
+	}
+	ws, err := upgrader.Upgrade(w, r, http.Header{})
+	if err != nil {
+		slog.Error("github log stream upgrade failed", "err", err)
+		return
+	}
+	defer ws.Close()
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	status := strings.ToLower(strings.TrimSpace(svc.Status))
+	isPreDeploy := status == "pending" || status == "building" || status == "deploying" || status == ""
+	if isPreDeploy {
+		lines := make(chan string, 64)
+		subID, ch, snap := app.Github.SubscribeBuildLogs(svc.Id)
+		defer app.Github.UnsubscribeBuildLogs(svc.Id, subID)
+		stateLine := `[state] ` + svc.Status + ` repo=` + svc.Repo + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
+		go func() {
+			defer close(lines)
+			select {
+			case lines <- stateLine:
+			case <-ctx.Done():
+				return
+			}
+			for _, l := range snap {
+				select {
+				case lines <- l:
+				case <-ctx.Done():
+					return
+				}
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case line, ok := <-ch:
+					if !ok {
+						return
+					}
+					select {
+					case lines <- line:
+					case <-ctx.Done():
+						return
+					}
+				}
+			}
+		}()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case line, ok := <-lines:
+				if !ok {
+					return
+				}
+				_ = ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+				if err := ws.WriteJSON(struct {
+					Message string `json:"message"`
+				}{Message: line}); err != nil {
+					cancel()
+					return
+				}
+			}
+		}
+	}
+	lines := make(chan string)
+	go func() {
+		defer close(lines)
+		svcRes := deploy.Service{
+			Namespace: "proj-" + projectId,
+			Name:      svc.ResourceName,
+		}
+		isDiagnostic := status == "pending" || status == "failed"
+		var logErr error
+		if isDiagnostic {
+			logErr = app.Deploy.GetServiceDiagnosticLogs(ctx, svcRes, lines)
+		} else {
+			logErr = app.Deploy.GetServiceLogs(ctx, svcRes, lines)
+		}
+		if logErr != nil && ctx.Err() == nil {
+			slog.Error("github log stream failed", "service_id", githubServiceId, "status", svc.Status, "err", logErr)
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case line, ok := <-lines:
+			if !ok {
+				return
+			}
+			_ = ws.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := ws.WriteJSON(struct {
+				Message string `json:"message"`
+			}{Message: line}); err != nil {
+				cancel()
+				return
+			}
+		}
 	}
 }
 

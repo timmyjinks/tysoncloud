@@ -16,7 +16,7 @@ function wsUrl(path: string) {
   return url.toString();
 }
 
-export function useLogStream(projectId: string, serviceId: string, enabled: boolean) {
+function useGenericLogStream(wsPath: string, enabled: boolean, deps: unknown[]) {
   const [lines, setLines] = useState<string[]>([]);
   const [dropped, setDropped] = useState(0);
   const [status, setStatus] = useState<LogStreamStatus>("connecting");
@@ -32,16 +32,15 @@ export function useLogStream(projectId: string, serviceId: string, enabled: bool
   }, []);
 
   useEffect(() => {
-    if (!enabled || !serviceId) return;
+    if (!enabled || !wsPath) return;
 
     stoppedRef.current = false;
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
-
     async function connect() {
       setStatus("connecting");
       const token = await (window as any).Clerk?.session?.getToken();
-      const url = wsUrl(`/projects/${projectId}/services/${serviceId}/logs?token=${token}`);
+      const url = wsUrl(`${wsPath}?token=${token}`);
       const ws = new WebSocket(url);
       wsRef.current = ws;
 
@@ -87,7 +86,18 @@ export function useLogStream(projectId: string, serviceId: string, enabled: bool
       wsRef.current?.close();
       wsRef.current = null;
     };
-  }, [projectId, serviceId, enabled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wsPath, enabled, ...deps]);
 
   return { lines, status, clear, firstLineNumber: dropped + 1 };
+}
+
+export function useLogStream(projectId: string, serviceId: string, enabled: boolean) {
+  const wsPath = `/projects/${projectId}/services/${serviceId}/logs`;
+  return useGenericLogStream(wsPath, enabled, [projectId, serviceId]);
+}
+
+export function useGithubLogStream(projectId: string, githubServiceId: string, enabled: boolean) {
+  const wsPath = `/projects/${projectId}/github_services/${githubServiceId}/logs`;
+  return useGenericLogStream(wsPath, enabled, [projectId, githubServiceId]);
 }

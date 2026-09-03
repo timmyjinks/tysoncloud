@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Terminal, Trash2 } from "lucide-react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useDeleteGithubService, useGithubService } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { ErrorBanner } from "@/components/error-banner";
+import { GithubServiceLogsDrawer } from "@/components/github-service-logs-drawer";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 
 export const Route = createFileRoute("/projects/$projectId/github_services/$githubServiceId/")({
@@ -22,6 +23,7 @@ function GithubServiceDetail() {
   const { data: service, isLoading, error, refetch } = useGithubService(githubServiceId);
   const deleteGithubService = useDeleteGithubService(projectId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
 
   if (error) {
     return (
@@ -63,6 +65,10 @@ function GithubServiceDetail() {
             </Button>
           }
         >
+          <DropdownMenuItem onClick={() => setLogsOpen(true)}>
+            <Terminal className="h-4 w-4" />
+            View logs
+          </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
               navigate({
@@ -151,6 +157,14 @@ function GithubServiceDetail() {
             onSuccess: () => navigate({ to: "/projects/$projectId", params: { projectId } }),
           })
         }
+      />
+
+      <GithubServiceLogsDrawer
+        open={logsOpen}
+        onOpenChange={setLogsOpen}
+        projectId={projectId}
+        githubServiceId={service.id}
+        serviceName={service.name}
       />
     </main>
   );

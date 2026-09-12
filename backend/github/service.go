@@ -31,13 +31,7 @@ func NewService(cfg config.Github, reg config.Registry) *Service {
 }
 
 func (s *Service) RegistryURL() string {
-	if s.reg.URL != "" {
-		return s.reg.URL
-	}
-	if v := os.Getenv("REGISTRY_URL"); v != "" {
-		return v
-	}
-	return "10.43.41.193:5000"
+	return s.reg.URL
 }
 
 func RegistryTag(registryURL, resourceName, tag string) string {

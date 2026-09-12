@@ -65,7 +65,7 @@ func Load() (Config, error) {
 			InstallationToken: getString("GITHUB_INSTALLATION_TOKEN", ""),
 		},
 		Registry: Registry{
-			URL: getString("REGISTRY_URL", "registry.tc-system.svc.cluster.local:5000"),
+			URL: getString("REGISTRY_URL", "10.43.41.193:5000"),
 		},
 		KubeConfig: getString("KUBECONFIG", "~/.kube/config"),
 	}, nil

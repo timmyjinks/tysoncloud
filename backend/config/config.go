@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -42,7 +43,7 @@ type Supabase struct {
 
 func Load() (Config, error) {
 	if err := godotenv.Load(); err != nil {
-		return Config{}, err
+		slog.Error(err.Error())
 	}
 
 	return Config{

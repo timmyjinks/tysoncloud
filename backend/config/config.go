@@ -41,9 +41,8 @@ type Supabase struct {
 }
 
 func Load() (Config, error) {
-	// Try repo root .env, then backend/.env, ignore missing
 	if err := godotenv.Load(); err != nil {
-		_ = godotenv.Load("backend/.env")
+		return Config{}, err
 	}
 
 	return Config{

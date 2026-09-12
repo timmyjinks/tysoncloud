@@ -91,3 +91,61 @@ export type BulkDeleteResponse = {
 export type ProjectConfigApplyRequest = {
   content: string;
 };
+
+export type GithubService = {
+  id: string;
+  project_id: string;
+  name: string;
+  repo_name: string;
+  repo_id: number;
+  root_dir: string;
+  port: number;
+  status: string;
+  public_domain: string;
+  private_domain: string;
+  env: Record<string, string>;
+  created_at: string;
+};
+
+export type GithubServiceCreateRequest = {
+  name: string;
+  repo: string;
+  repo_id: number;
+  port: number;
+  domain?: string | null;
+  root_dir: string;
+  env?: string;
+};
+
+export type GithubServiceUpdateRequest = {
+  name?: string;
+  port?: number;
+  domain?: string | null;
+  env?: string;
+};
+
+export type GithubConnection = {
+  id: string;
+  user_id: string;
+  installation_id: number;
+  created_at: string;
+};
+
+export type GithubConnectionCreateRequest = {
+  installation_id: number;
+};
+
+export type GithubRepo = {
+  id: number;
+  name: string;
+  full_name: string;
+  clone_url: string;
+  html_url: string;
+  private: boolean;
+  default_branch: string;
+};
+
+export type GithubReposResponse = {
+  total_count: number;
+  repositories: GithubRepo[];
+};

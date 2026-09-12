@@ -1,4 +1,23 @@
 services:
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: tysoncloud-buildkit
+    restart: unless-stopped
+    command: --addr tcp://0.0.0.0:1234 --addr unix:///run/buildkit/buildkitd.sock
+    ports:
+      - "1234:1234"
+    privileged: true
+  registry:
+    image: registry:2.8
+    container_name: tysoncloud-registry
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    volumes:
+      - registry-data:/var/lib/registry
   backend:
     build:
       context: ./backend
@@ -10,8 +29,14 @@ services:
     environment:
       ADDR: ":8080"
       ALLOWED_ORIGINS: "http://localhost:3000"
+      REGISTRY_URL: "registry:5000"
+      BUILDKIT_HOST: "tcp://buildkit:1234"
+      REGISTRY_INSECURE: "true"
     ports:
       - "8080:8080"
+    depends_on:
+      - buildkit
+      - registry
 
   frontend:
     build:
@@ -26,3 +51,6 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+
+volumes:
+  registry-data:

@@ -118,6 +118,13 @@ func isDomainTakenError(err error) bool {
 	return strings.Contains(lower, "duplicate") && (strings.Contains(lower, "domain") || strings.Contains(lower, "public_domain"))
 }
 
+func isDuplicateKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "duplicate key value")
+}
+
 func isDomainValidationError(err error) bool {
 	if err == nil {
 		return false

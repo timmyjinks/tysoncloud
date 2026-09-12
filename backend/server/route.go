@@ -28,6 +28,14 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/services/{service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/services/{service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteService))).Methods("DELETE")
 
+	r.Handle("/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubService))).Methods("GET")
+	r.Handle("/projects/{project_id}/github_services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubServices))).Methods("GET")
+	r.Handle("/projects/{project_id}/github_services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubServices))).Methods("DELETE")
+	r.Handle("/projects/{project_id}/github_services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateGithubService))).Methods("POST")
+	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateGithubService))).Methods("PUT")
+	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubService))).Methods("DELETE")
+	r.HandleFunc("/projects/{project_id}/github_services/{github_service_id}/logs", s.GetGithubServiceLogs).Methods("GET")
+
 	r.Handle("/services/{service_id}/volumes", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetVolume))).Methods("GET")
 	r.Handle("/projects/{project_id}/services/{service_id}/volumes", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateVolume))).Methods("POST")
 	r.Handle("/projects/{project_id}/services/{service_id}/volumes", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteVolume))).Methods("DELETE")
@@ -40,6 +48,16 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/databases/{database_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteDatabase))).Methods("DELETE")
 
 	r.Handle("/projects/{project_id}/config", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.ConfigProject))).Methods("POST")
+
+	r.Handle("/github/installations/{installation_id}/repositories", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GithubRepos))).Methods("GET")
+
+	r.Handle("/github/connections", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubConnections))).Methods("GET")
+	r.Handle("/github/connections", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateGithubConnection))).Methods("POST")
+	r.Handle("/github/connections/{connection_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubConnection))).Methods("DELETE")
+
+	r.Handle("/github/app", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetGithubApp))).Methods("GET")
+
+	r.HandleFunc("/webhooks/github", s.GithubWebhook).Methods("POST")
 
 	return nil
 }

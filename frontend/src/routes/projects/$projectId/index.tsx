@@ -1,9 +1,23 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Database as DatabaseIcon, FileCode, Pencil, Plus, Server, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  Database as DatabaseIcon,
+  FileCode,
+  Github,
+  Pencil,
+  Plus,
+  Server,
+  Trash2,
+} from "lucide-react";
 import { useProject } from "@/lib/api/projects";
 import { useDeleteService, useDeleteServices, useServices } from "@/lib/api/services";
 import { useDatabases, useDeleteDatabase, useDeleteDatabases } from "@/lib/api/databases";
+import {
+  useDeleteGithubService,
+  useDeleteGithubServices,
+  useGithubServices,
+} from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { ResourceRow } from "@/components/resource-row";
 import { ResourceStatusBar } from "@/components/resource-status-bar";
@@ -12,15 +26,19 @@ import { BulkDeleteConfirmDialog } from "@/components/bulk-delete-confirm-dialog
 import { ErrorBanner } from "@/components/error-banner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { Service, Database } from "@/lib/api/types";
+import type { Service, Database, GithubService } from "@/lib/api/types";
 
 export const Route = createFileRoute("/projects/$projectId/")({
   component: ProjectDetail,
 });
 
-type Resource = { kind: "service"; data: Service } | { kind: "database"; data: Database };
+type Resource =
+  | { kind: "service"; data: Service }
+  | { kind: "database"; data: Database }
+  | { kind: "github_service"; data: GithubService };
 
 function ProjectDetail() {
   const { projectId } = Route.useParams();
@@ -38,30 +56,42 @@ function ProjectDetail() {
     error: databasesError,
     refetch: refetchDatabases,
   } = useDatabases(projectId);
+  const {
+    data: githubServices,
+    isLoading: githubServicesLoading,
+    error: githubServicesError,
+    refetch: refetchGithubServices,
+  } = useGithubServices(projectId);
 
   const deleteService = useDeleteService(projectId);
   const deleteDatabase = useDeleteDatabase(projectId);
   const deleteServices = useDeleteServices(projectId);
   const deleteDatabases = useDeleteDatabases(projectId);
+  const deleteGithubService = useDeleteGithubService(projectId);
+  const deleteGithubServices = useDeleteGithubServices(projectId);
   const [pendingService, setPendingService] = useState<Service | null>(null);
   const [pendingDatabase, setPendingDatabase] = useState<Database | null>(null);
+  const [pendingGithubService, setPendingGithubService] = useState<GithubService | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulk, setPendingBulk] = useState<Resource[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
-  const isLoading = servicesLoading || databasesLoading;
+  const isLoading = servicesLoading || databasesLoading || githubServicesLoading;
 
   const resources = useMemo<Resource[]>(() => {
     const items: Resource[] = [
       ...(services ?? []).map((s) => ({ kind: "service" as const, data: s })),
       ...(databases ?? []).map((d) => ({ kind: "database" as const, data: d })),
+      ...(githubServices ?? []).map((g) => ({ kind: "github_service" as const, data: g })),
     ];
     return items.sort(
       (a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime(),
     );
-  }, [services, databases]);
+  }, [services, databases, githubServices]);
 
-  const runningCount = (services ?? []).filter((s) => s.status === "running").length;
+  const runningCount =
+    (services ?? []).filter((s) => s.status === "running").length +
+    (githubServices ?? []).filter((s) => s.status === "running").length;
 
   const allSelected = resources.length > 0 && selectedIds.size === resources.length;
 
@@ -82,7 +112,8 @@ function ProjectDetail() {
   };
 
   const selectedResources = resources.filter((r) => selectedIds.has(r.data.id));
-  const bulkPending = deleteServices.isPending || deleteDatabases.isPending;
+  const bulkPending =
+    deleteServices.isPending || deleteDatabases.isPending || deleteGithubServices.isPending;
 
   const onBulkConfirm = () => {
     if (!pendingBulk) return;
@@ -92,6 +123,9 @@ function ProjectDetail() {
       .map((r) => r.data.id);
     const databaseIds = pendingBulk
       .filter((r): r is Resource & { kind: "database" } => r.kind === "database")
+      .map((r) => r.data.id);
+    const githubServiceIds = pendingBulk
+      .filter((r): r is Resource & { kind: "github_service" } => r.kind === "github_service")
       .map((r) => r.data.id);
 
     if (serviceIds.length > 0) {
@@ -103,9 +137,11 @@ function ProjectDetail() {
             setBulkError(
               `Couldn't delete ${data.failed.length} service${data.failed.length === 1 ? "" : "s"}.`,
             );
-          } else if (remaining.size === 0) {
+          } else if (remaining.size === 0 && githubServiceIds.length === 0 && databaseIds.length === 0) {
             setPendingBulk(null);
             setBulkError(null);
+          } else if (remaining.size === 0) {
+            // wait for other mutations
           }
         },
       });
@@ -119,6 +155,23 @@ function ProjectDetail() {
           if (data.failed.length > 0) {
             setBulkError(
               `Couldn't delete ${data.failed.length} database${data.failed.length === 1 ? "" : "s"}.`,
+            );
+          } else if (remaining.size === 0) {
+            setPendingBulk(null);
+            setBulkError(null);
+          }
+        },
+      });
+    }
+
+    if (githubServiceIds.length > 0) {
+      deleteGithubServices.mutate(githubServiceIds, {
+        onSuccess: (data) => {
+          data.deleted.forEach((id) => remaining.delete(id));
+          setSelectedIds(new Set(remaining));
+          if (data.failed.length > 0) {
+            setBulkError(
+              `Couldn't delete ${data.failed.length} GitHub service${data.failed.length === 1 ? "" : "s"}.`,
             );
           } else if (remaining.size === 0) {
             setPendingBulk(null);
@@ -169,20 +222,49 @@ function ProjectDetail() {
             <span className="text-[var(--color-text-faint)]">· {resources.length} total</span>
           </h2>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/projects/$projectId/databases/new" params={{ projectId }}>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4" />
-              Database
-            </Button>
-          </Link>
-          <Link to="/projects/$projectId/services/new" params={{ projectId }}>
+        <DropdownMenu
+          trigger={
             <Button size="sm">
               <Plus className="h-4 w-4" />
-              Service
+              New
+              <ChevronDown className="h-4 w-4 opacity-60" />
             </Button>
-          </Link>
-        </div>
+          }
+        >
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/services/new",
+                params: { projectId },
+              })
+            }
+          >
+            <Server className="h-4 w-4" />
+            Service
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/github_services/new",
+                params: { projectId },
+              })
+            }
+          >
+            <Github className="h-4 w-4" />
+            GitHub Service
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() =>
+              navigate({
+                to: "/projects/$projectId/databases/new",
+                params: { projectId },
+              })
+            }
+          >
+            <DatabaseIcon className="h-4 w-4" />
+            Database
+          </DropdownMenuItem>
+        </DropdownMenu>
       </div>
 
       {selectedIds.size > 0 && (
@@ -226,6 +308,15 @@ function ProjectDetail() {
         />
       )}
 
+      {githubServicesError && (
+        <ErrorBanner
+          className="mb-4"
+          message={getErrorMessage(githubServicesError)}
+          onRetry={() => refetchGithubServices()}
+          retryLabel="Retry"
+        />
+      )}
+
       {!isLoading && resources.length === 0 && (
         <div className="rounded-lg border border-dashed border-[var(--color-border-strong)] p-16 text-center text-base text-[var(--color-text-muted)]">
           Nothing deployed yet — spin up a service or provision a database to get started.
@@ -263,6 +354,31 @@ function ProjectDetail() {
                   selected={selectedIds.has(resource.data.id)}
                   onToggleSelect={() => toggleSelect(resource.data.id)}
                 />
+              ) : resource.kind === "github_service" ? (
+                <ResourceRow
+                  key={`gh-${resource.data.id}`}
+                  icon={<Github className="h-5 w-5" />}
+                  name={resource.data.name}
+                  status={resource.data.status}
+                  runtime={resource.data.repo}
+                  subtitle={`root:${resource.data.root_dir} · ${SERVICE_RESOURCE_LIMITS.cpu} · ${SERVICE_RESOURCE_LIMITS.memory}`}
+                  size={`:${resource.data.port}`}
+                  domain={resource.data.public_domain}
+                  domainHref={
+                    resource.data.public_domain ? `https://${resource.data.public_domain}` : undefined
+                  }
+                  privateDomain={resource.data.private_domain}
+                  detailHref={`/projects/${projectId}/github_services/${resource.data.id}`}
+                  onUpdate={() =>
+                    navigate({
+                      to: "/projects/$projectId/github_services/$githubServiceId/edit",
+                      params: { projectId, githubServiceId: resource.data.id },
+                    })
+                  }
+                  onDelete={() => setPendingGithubService(resource.data)}
+                  selected={selectedIds.has(resource.data.id)}
+                  onToggleSelect={() => toggleSelect(resource.data.id)}
+                />
               ) : (
                 <ResourceRow
                   key={`db-${resource.data.id}`}
@@ -290,7 +406,7 @@ function ProjectDetail() {
           </div>
 
           <ResourceStatusBar
-            serviceCount={services?.length ?? 0}
+            serviceCount={(services?.length ?? 0) + (githubServices?.length ?? 0)}
             databaseCount={databases?.length ?? 0}
             runningCount={runningCount}
             projectId={projectId}
@@ -324,6 +440,21 @@ function ProjectDetail() {
           if (!pendingDatabase) return;
           deleteDatabase.mutate(pendingDatabase.id, {
             onSuccess: () => setPendingDatabase(null),
+          });
+        }}
+      />
+
+      <DeleteConfirmDialog
+        open={!!pendingGithubService}
+        onOpenChange={(open) => !open && setPendingGithubService(null)}
+        resourceName={pendingGithubService?.name ?? ""}
+        resourceLabel="GitHub service"
+        pending={deleteGithubService.isPending}
+        error={deleteGithubService.error ? getErrorMessage(deleteGithubService.error) : undefined}
+        onConfirm={() => {
+          if (!pendingGithubService) return;
+          deleteGithubService.mutate(pendingGithubService.id, {
+            onSuccess: () => setPendingGithubService(null),
           });
         }}
       />

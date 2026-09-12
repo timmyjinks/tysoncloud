@@ -96,6 +96,42 @@ type ServiceDeleteRequest struct {
 	Id string `json:"id"`
 }
 
+type GithubServiceResponse struct {
+	Id             string            `json:"id"`
+	ProjectId      string            `json:"project_id"`
+	Name           string            `json:"name"`
+	Repo           string            `json:"repo_name"`
+	RepoId         int64             `json:"repo_id"`
+	RootDir        string            `json:"root_dir"`
+	Port           int32             `json:"port"`
+	Status         string            `json:"status"`
+	PublicDomain   string            `json:"public_domain"`
+	InternalDomain string            `json:"private_domain"`
+	Env            map[string]string `json:"env"`
+	CreatedAt      time.Time         `json:"created_at"`
+}
+
+type GithubServiceCreateRequest struct {
+	Name    string  `json:"name"`
+	Repo    string  `json:"repo"`
+	RepoId  int64   `json:"repo_id"`
+	Port    int32   `json:"port"`
+	Domain  *string `json:"domain"`
+	RootDir string  `json:"root_dir"`
+	Env     string  `json:"env"`
+}
+
+type GithubServiceUpdateRequest struct {
+	Name   *string `json:"name"`
+	Port   *int32  `json:"port"`
+	Domain *string `json:"domain"`
+	Env    *string `json:"env"`
+}
+
+type GithubServiceDeleteRequest struct {
+	Id string `json:"id"`
+}
+
 type ProjectResponse struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
@@ -107,6 +143,17 @@ type ProjectCreateRequest struct {
 
 type ProjectUpdateRequest struct {
 	Name *string `json:"name,omitempty"`
+}
+
+type GithubConnectionResponse struct {
+	Id             string    `json:"id"`
+	UserId         string    `json:"user_id"`
+	InstallationId int64     `json:"installation_id"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type GithubConnectionCreateRequest struct {
+	InstallationId int64 `json:"installation_id"`
 }
 
 type ProjectConfigRequest struct {

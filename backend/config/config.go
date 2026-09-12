@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
@@ -12,6 +11,8 @@ import (
 type Config struct {
 	Server     Server
 	Supabase   Supabase
+	Github     Github
+	Registry   Registry
 	KubeConfig string `env:"KUBECONFIG"`
 }
 
@@ -22,15 +23,26 @@ type Server struct {
 	ClusterIp      string `env:"CLUSTER_IP"`
 }
 
+type Github struct {
+	WebhookSecret     string `env:"GITHUB_WEBHOOK_SECRET"`
+	AppSlug           string `env:"GITHUB_APP_SLUG"`
+	AppID             string `env:"GITHUB_APP_ID"`
+	AppPrivateKey     string `env:"GITHUB_APP_PRIVATE_KEY"`
+	InstallationToken string `env:"GITHUB_INSTALLATION_TOKEN"`
+}
+
+type Registry struct {
+	URL string `env:"REGISTRY_URL"`
+}
+
 type Supabase struct {
 	ProjectURL string `env:"SUPABASE_URL"`
 	APIKey     string `env:"SUPABASE_API_KEY"`
 }
 
 func Load() (Config, error) {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println(err)
+	if err := godotenv.Load(); err != nil {
+		return Config{}, err
 	}
 
 	return Config{
@@ -43,6 +55,16 @@ func Load() (Config, error) {
 		Supabase: Supabase{
 			ProjectURL: getStringOrDie("SUPABASE_URL"),
 			APIKey:     getStringOrDie("SUPABASE_API_KEY"),
+		},
+		Github: Github{
+			WebhookSecret:     getString("GITHUB_WEBHOOK_SECRET", ""),
+			AppSlug:           getString("GITHUB_APP_SLUG", ""),
+			AppID:             getString("GITHUB_APP_ID", ""),
+			AppPrivateKey:     getString("GITHUB_APP_PRIVATE_KEY", ""),
+			InstallationToken: getString("GITHUB_INSTALLATION_TOKEN", ""),
+		},
+		Registry: Registry{
+			URL: getString("REGISTRY_URL", "10.43.41.193:5000"),
 		},
 		KubeConfig: getString("KUBECONFIG", "~/.kube/config"),
 	}, nil

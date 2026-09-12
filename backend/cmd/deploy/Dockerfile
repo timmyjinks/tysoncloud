@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 FROM golang:1.26 AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 
 # Leverage BuildKit cache mounts for Go modules + build cache
@@ -12,8 +13,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -ldflags="-w -s" -o /bin/deploy ./cmd/deploy
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl docker.io bash && rm -rf /var/lib/apt/lists/* \
+    && groupadd -f docker && useradd -u 65532 -m -G docker nonroot \
+    && curl -fsSL https://railpack.com/install.sh | bash -s -- --yes || echo "railpack install failed, continuing with docker fallback" \
+    && BUILDKIT_VERSION="0.23.2" && ARCH="$(dpkg --print-architecture)" && case "$ARCH" in amd64) BARCH="amd64";; arm64) BARCH="arm64";; *) BARCH="amd64";; esac && curl -fsSL "https://github.com/moby/buildkit/releases/download/v${BUILDKIT_VERSION}/buildkit-v${BUILDKIT_VERSION}.linux-${BARCH}.tar.gz" | tar -xz -C /usr/local && ln -sf /usr/local/bin/buildctl /usr/bin/buildctl
 COPY --from=builder /bin/deploy /bin/deploy
+USER nonroot
 
 EXPOSE 8080
 

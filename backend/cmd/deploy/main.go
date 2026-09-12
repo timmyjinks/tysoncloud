@@ -7,6 +7,7 @@ import (
 	"github.com/timmyjinks/tysoncloud/config"
 	"github.com/timmyjinks/tysoncloud/db"
 	"github.com/timmyjinks/tysoncloud/deploy"
+	"github.com/timmyjinks/tysoncloud/github"
 	"github.com/timmyjinks/tysoncloud/kubernetes"
 	"github.com/timmyjinks/tysoncloud/server"
 	"github.com/timmyjinks/tysoncloud/store"
@@ -31,6 +32,8 @@ func main() {
 
 	deployService := deploy.NewDeployService(kubernetesService)
 
+	githubService := github.NewService(cfg.Github, cfg.Registry)
+
 	clerk.SetKey(cfg.Server.ClerkApiKey)
 
 	taskRegistry := server.NewTaskRegistry()
@@ -39,6 +42,7 @@ func main() {
 		Config:       cfg,
 		Supabase:     supabaseService,
 		Deploy:       deployService,
+		Github:       githubService,
 		TaskRegistry: taskRegistry,
 	}
 

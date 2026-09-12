@@ -1,16 +1,16 @@
-import { useLogStream } from "@/lib/logs/use-log-stream";
+import { useGithubLogStream } from "@/lib/logs/use-log-stream";
 import { LogsDrawer } from "@/components/logs-drawer";
 
-type ServiceLogsDrawerProps = {
+type GithubServiceLogsDrawerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId: string;
-  serviceId: string;
+  githubServiceId: string;
   serviceName: string;
 };
 
-export function ServiceLogsDrawer({ open, onOpenChange, projectId, serviceId, serviceName }: ServiceLogsDrawerProps) {
-  const { lines, status, clear, firstLineNumber } = useLogStream(projectId, serviceId, open);
+export function GithubServiceLogsDrawer({ open, onOpenChange, projectId, githubServiceId, serviceName }: GithubServiceLogsDrawerProps) {
+  const { lines, status, clear, firstLineNumber } = useGithubLogStream(projectId, githubServiceId, open);
   return (
     <LogsDrawer
       open={open}

@@ -137,8 +137,6 @@ func (s *SupabaseStore) UpdateGithubServiceStatus(id, userId, status string) (Gi
 
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
-		// Graceful fallback: if the RPC is missing (schema cache), try the by-id variant
-		// so builds don't 500 on missing function `update_github_service_status`.
 		if isMissingFunctionError(pgErr) {
 			return s.UpdateGithubServiceStatusById(id, status)
 		}
@@ -200,7 +198,6 @@ func (s *SupabaseStore) updateGithubServiceStatusDirect(id, status string) (Gith
 	if err != nil {
 		return GithubServicesTable{}, err
 	}
-	// Supabase may return array with one element
 	var arr []GithubServicesTable
 	if err := json.Unmarshal(res, &arr); err == nil && len(arr) == 1 {
 		return arr[0], nil

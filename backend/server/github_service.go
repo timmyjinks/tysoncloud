@@ -590,7 +590,7 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 		lines := make(chan string, 64)
 		subID, ch, snap := app.Github.SubscribeBuildLogs(svc.Id)
 		defer app.Github.UnsubscribeBuildLogs(svc.Id, subID)
-		stateLine := `[state] ` + svc.Status + ` repo=` + svc.Repo + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
+		stateLine := `[state] ` + svc.Status + ` repo=` + svc.RepoName + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
 		go func() {
 			defer close(lines)
 			select {

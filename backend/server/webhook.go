@@ -151,9 +151,9 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				app.Github.AppendBuildLog(svc.Id, line)
 			}
 			emitState := func(to string) {
-				line := `[state] ` + to + ` commit=` + tag + ` repo=` + svc.Repo + ` root_dir=` + sanitizedRootDir
+				line := `[state] ` + to + ` commit=` + tag + ` repo=` + svc.RepoName + ` root_dir=` + sanitizedRootDir
 				app.Github.AppendBuildLog(svc.Id, line)
-				slog.Info("github deploy state", "service_id", svc.Id, "to", to, "commit", tag, "repo", svc.Repo, "root_dir", sanitizedRootDir)
+				slog.Info("github deploy state", "service_id", svc.Id, "to", to, "commit", tag, "repo", svc.RepoName, "root_dir", sanitizedRootDir)
 			}
 			emitState("building")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatusById(svc.Id, "building"); statusErr != nil {

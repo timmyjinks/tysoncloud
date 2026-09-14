@@ -83,6 +83,20 @@ spec:
                 secretKeyRef:
                   key: SUPABASE_API_KEY
                   name: tysoncloud-backend
+            - name: GITHUB_APP_SLUG
+              value: tysoncloud
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  key: GITHUB_APP_ID
+                  name: tysoncloud-backend
+                  optional: true
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: GITHUB_APP_PRIVATE_KEY
+                  name: tysoncloud-backend
+                  optional: true
         - name: buildkitd
           image: moby/buildkit:latest
           args:

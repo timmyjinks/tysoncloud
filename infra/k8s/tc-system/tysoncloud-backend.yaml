@@ -73,11 +73,6 @@ spec:
                 secretKeyRef:
                   key: CLERK_API_KEY
                   name: tysoncloud-backend
-            - name: CLOUDFLARE_BASE_DOMAIN
-              valueFrom:
-                secretKeyRef:
-                  key: CLOUDFLARE_BASE_DOMAIN
-                  name: tysoncloud-backend
             - name: SUPABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -87,26 +82,6 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: SUPABASE_API_KEY
-                  name: tysoncloud-backend
-            - name: CLOUDFLARE_API_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: CLOUDFLARE_API_TOKEN
-                  name: tysoncloud-backend
-            - name: CLOUDFLARE_TUNNEL_ID
-              valueFrom:
-                secretKeyRef:
-                  key: CLOUDFLARE_TUNNEL_ID
-                  name: tysoncloud-backend
-            - name: CLOUDFLARE_ACCOUNT_ID
-              valueFrom:
-                secretKeyRef:
-                  key: CLOUDFLARE_ACCOUNT_ID
-                  name: tysoncloud-backend
-            - name: CLOUDFLARE_ZONE_ID
-              valueFrom:
-                secretKeyRef:
-                  key: CLOUDFLARE_ZONE_ID
                   name: tysoncloud-backend
         - name: buildkitd
           image: moby/buildkit:latest

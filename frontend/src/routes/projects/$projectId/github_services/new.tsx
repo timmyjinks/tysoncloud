@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Github, Lock, Search, X } from "lucide-react";
-import { useCreateGithubService, useGithubConnections, useGithubRepos } from "@/lib/api/github";
+import { ExternalLink, Github, Lock, RefreshCw, Search, X } from "lucide-react";
+import { useCreateGithubService, useGithubApp, useGithubConnections, useGithubRepos } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { FormShell } from "@/components/form-shell";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,15 @@ function NewGithubServicePage() {
   const navigate = useNavigate();
   const createGithubService = useCreateGithubService(projectId);
   const { data: connections } = useGithubConnections();
+  const { data: appInfo } = useGithubApp();
   const installationId = connections?.[0]?.installation_id ? String(connections[0].installation_id) : "";
-  const { data: reposData, isLoading: reposLoading, error: reposError } = useGithubRepos(installationId);
+  const {
+    data: reposData,
+    isLoading: reposLoading,
+    isFetching: reposFetching,
+    error: reposError,
+    refetch: refetchRepos,
+  } = useGithubRepos(installationId);
 
   const [name, setName] = useState("");
   const [repo, setRepo] = useState("");
@@ -41,6 +48,16 @@ function NewGithubServicePage() {
   }, [repos, filter]);
 
   const hasConnection = !!installationId;
+
+  // Settings edit flow has no redirect back to us, so link out to GitHub and
+  // let the user return here and hit Refresh (plus auto-refetch on focus).
+  // Native anchors (not window.open): real link clicks open a new tab per the
+  // browser's tab preference and are never treated as popups.
+  const configureUrl = useMemo(() => {
+    if (installationId) return `https://github.com/settings/installations/${installationId}`;
+    if (appInfo?.install_url) return appInfo.install_url;
+    return "https://github.com/settings/installations";
+  }, [appInfo, installationId]);
 
   return (
     <FormShell
@@ -98,14 +115,55 @@ function NewGithubServicePage() {
       </div>
 
       <div>
-        <Label htmlFor="repo-filter">Repository</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="repo-filter">Repository</Label>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => refetchRepos()}
+              disabled={reposLoading || reposFetching || !hasConnection}
+              className="inline-flex cursor-pointer items-center gap-1 rounded p-1 text-xs text-[var(--color-text-faint)] hover:text-[var(--color-text)] disabled:cursor-default disabled:opacity-50"
+              title="Refresh repository list"
+              aria-label="Refresh repository list"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${reposFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            <a
+              href={configureUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex cursor-pointer items-center gap-1 rounded p-1 text-xs text-[var(--color-text-faint)] hover:text-[var(--color-accent)]"
+              title="Add or remove repository access in GitHub (opens in a new tab)"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Configure GitHub App
+            </a>
+          </div>
+        </div>
+        <p className="mt-1 text-xs text-[var(--color-text-faint)]">
+          Opens GitHub in a new tab — Save there, come back here, and hit Refresh.
+        </p>
         {reposLoading ? (
           <p className="mt-2 text-sm text-[var(--color-text-faint)]">loading repositories…</p>
         ) : reposError ? (
-          <ErrorBanner className="mt-2" message={getErrorMessage(reposError)} />
+          <>
+            <ErrorBanner className="mt-2" message={getErrorMessage(reposError)} />
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">
+              Missing a repo?{" "}
+              <a href={configureUrl} target="_blank" rel="noreferrer" className="cursor-pointer underline hover:text-[var(--color-accent)]">
+                Configure the GitHub App
+              </a>{" "}
+              to grant access, then hit Refresh.
+            </p>
+          </>
         ) : repos.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--color-text-faint)]">
-            No repositories found. Install the GitHub App on a repo and refresh.
+            No repositories found.{" "}
+            <a href={configureUrl} target="_blank" rel="noreferrer" className="cursor-pointer underline hover:text-[var(--color-accent)]">
+              Configure the GitHub App
+            </a>{" "}
+            to grant access, then hit Refresh.
           </p>
         ) : (
           <>
@@ -143,7 +201,13 @@ function NewGithubServicePage() {
             <div className="mt-2 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
               <div className="max-h-64 overflow-y-auto divide-y divide-[var(--color-border)]">
                 {filteredRepos.length === 0 ? (
-                  <p className="px-3 py-8 text-center text-sm text-[var(--color-text-faint)]">No matches.</p>
+                  <p className="px-3 py-8 text-center text-sm text-[var(--color-text-faint)]">
+                    No matches.{" "}
+                    <a href={configureUrl} target="_blank" rel="noreferrer" className="cursor-pointer underline hover:text-[var(--color-accent)]">
+                      Configure the GitHub App
+                    </a>{" "}
+                    if the repo was just added.
+                  </p>
                 ) : (
                   filteredRepos.map((r) => {
                     const selected = repo === r.full_name;

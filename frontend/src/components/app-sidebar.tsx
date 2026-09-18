@@ -128,7 +128,7 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
 
       <div className="flex items-center justify-between border-t border-[var(--color-border)] px-5 py-4">
         <UserButton />
-        <span className="font-mono text-xs text-[var(--color-text-faint)]">v0.1</span>
+        <div></div>
       </div>
     </aside>
   );

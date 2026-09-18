@@ -34,6 +34,8 @@ export function useGithubConnections() {
   return useQuery({
     queryKey: githubKeys.connections,
     queryFn: () => api.get<GithubConnection[]>("/github/connections"),
+    // Install completes in a new tab; refetch when returning here.
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -59,6 +61,9 @@ export function useGithubRepos(installationId: string) {
     queryKey: githubKeys.repos(installationId),
     queryFn: () => api.get<GithubReposResponse>(`/github/installations/${installationId}/repositories`),
     enabled: !!installationId,
+    // Configure flow opens GitHub in a new tab with no redirect back, so
+    // refetch when the user returns to this tab.
+    refetchOnWindowFocus: true,
   });
 }
 

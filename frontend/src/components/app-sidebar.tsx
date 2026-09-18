@@ -1,9 +1,8 @@
-import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { UserButton } from "@clerk/clerk-react";
 import { Github, LayoutGrid, Plus } from "lucide-react";
 import { useProjects } from "@/lib/api/projects";
-import { useCreateGithubConnection, useGithubApp, useGithubConnections } from "@/lib/api/github";
+import { useGithubApp, useGithubConnections } from "@/lib/api/github";
 import { cn } from "@/lib/utils";
 
 type AppSidebarProps = {
@@ -14,112 +13,23 @@ type AppSidebarProps = {
 export function AppSidebar({ activeProjectId }: AppSidebarProps) {
   const { data: projects } = useProjects();
   const { data: appInfo } = useGithubApp();
-  const { data: connections, refetch: refetchGithubConnection } = useGithubConnections();
-  const createGithubConnection = useCreateGithubConnection();
+  const { data: connections } = useGithubConnections();
   const isGithubConnected = (connections?.length ?? 0) > 0;
   const installUrl = appInfo?.install_url || "";
-  // Use a generic state so the callback can close the popup; projectId not required for global sidebar
+  // Install opens GitHub in a new tab (native anchor, never window.open, so
+  // never a popup window). GitHub redirects the new tab to our Setup URL
+  // (/github/callback), which saves the connection and lands on returnTo.
+  // returnTo is also stashed in localStorage since Setup URL drops ?state=.
+  const installReturnTo = activeProjectId ? `/projects/${activeProjectId}` : "/dashboard";
   const installUrlWithState = installUrl
-    ? `${installUrl}${installUrl.includes("?") ? "&" : "?"}state=${encodeURIComponent(activeProjectId ?? "dashboard")}`
+    ? `${installUrl}${installUrl.includes("?") ? "&" : "?"}state=${encodeURIComponent(installReturnTo)}`
     : "";
-  const popupRef = useRef<Window | null>(null);
-  const handledRef = useRef(false);
 
-  const handleIntegrateWithGithub = () => {
-    if (!installUrlWithState) return;
-    handledRef.current = false;
-    const w = 600;
-    const h = 700;
-    const left = window.screenX + (window.outerWidth - w) / 2;
-    const top = window.screenY + (window.outerHeight - h) / 2;
-    const popup = window.open(
-      installUrlWithState,
-      "tysoncloud-github-install",
-      `popup=yes,width=${w},height=${h},left=${left},top=${top},scrollbars=yes`,
-    );
-    if (!popup) {
-      window.location.href = installUrlWithState;
-      return;
-    }
-    popupRef.current = popup;
-    const timer = window.setInterval(() => {
-      if (popup.closed) {
-        window.clearInterval(timer);
-        popupRef.current = null;
-        refetchGithubConnection();
-        return;
-      }
-      if (handledRef.current) return;
-      try {
-        const href = popup.location.href;
-        if (href.includes("/github/callback") && href.includes("installation_id=")) {
-          const url = new URL(href);
-          const iid = url.searchParams.get("installation_id");
-          if (iid && !handledRef.current) {
-            handledRef.current = true;
-            window.clearInterval(timer);
-            createGithubConnection.mutate(
-              { installation_id: Number(iid) },
-              {
-                onSuccess: () => {
-                  try {
-                    popup.close();
-                  } catch {}
-                  popupRef.current = null;
-                  refetchGithubConnection();
-                },
-                onError: () => {
-                  try {
-                    popup.close();
-                  } catch {}
-                  popupRef.current = null;
-                  refetchGithubConnection();
-                },
-              },
-            );
-          }
-        }
-      } catch {}
-    }, 500);
+  const rememberReturnTo = () => {
+    try {
+      window.localStorage.setItem("tysoncloud:github:returnTo", installReturnTo);
+    } catch {}
   };
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type !== "github-app-installed") return;
-      if (handledRef.current) return;
-      const installationId = event.data.installation_id as string | undefined;
-      if (installationId) {
-        handledRef.current = true;
-        createGithubConnection.mutate(
-          { installation_id: Number(installationId) },
-          {
-            onSuccess: () => {
-              try {
-                popupRef.current?.close();
-              } catch {}
-              popupRef.current = null;
-              refetchGithubConnection();
-            },
-            onError: () => {
-              try {
-                popupRef.current?.close();
-              } catch {}
-              popupRef.current = null;
-              refetchGithubConnection();
-            },
-          },
-        );
-      } else {
-        try {
-          popupRef.current?.close();
-        } catch {}
-        popupRef.current = null;
-        refetchGithubConnection();
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [createGithubConnection, refetchGithubConnection]);
 
   return (
     <aside className="sticky top-0 flex h-screen w-72 shrink-0 flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
@@ -187,10 +97,17 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
             Integrations
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleIntegrateWithGithub}
-          title={isGithubConnected ? "GitHub is connected — click to manage/reinstall" : "Connect GitHub"}
+        <a
+          href={installUrlWithState || undefined}
+          target="_blank"
+          rel="noreferrer"
+          onClick={rememberReturnTo}
+          title={
+            isGithubConnected
+              ? "GitHub is connected — click to manage/reinstall (opens in a new tab)"
+              : "Connect GitHub (opens in a new tab)"
+          }
+          aria-disabled={!installUrlWithState}
           className="flex w-full items-center gap-2.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm transition-colors hover:bg-[var(--color-surface-hover)]"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[#24292f] text-white">
@@ -206,7 +123,7 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
               {isGithubConnected ? "Connected" : "Not connected"}
             </span>
           </span>
-        </button>
+        </a>
       </div>
 
       <div className="flex items-center justify-between border-t border-[var(--color-border)] px-5 py-4">

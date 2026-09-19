@@ -21,6 +21,7 @@ type GithubServicesTable struct {
 	PrivateDomain      string    `json:"private_domain"`
 	Port               int32     `json:"port"`
 	RootDir            string    `json:"root_dir"`
+	Branch             string    `json:"branch"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -63,7 +64,7 @@ func (s *SupabaseStore) GetGithubServices(projectId, userId string) ([]GithubSer
 	return table, nil
 }
 
-func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConnectionId, repo string, repoId int64, rootDir string, domain *string, port int32) (GithubServicesTable, error) {
+func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConnectionId, repo string, repoId int64, rootDir string, branch string, domain *string, port int32) (GithubServicesTable, error) {
 	result := s.cli.Rpc("create_github_service", "", map[string]interface{}{
 		"p_project_id":           projectId,
 		"p_github_connection_id": githubConnectionId,
@@ -72,6 +73,7 @@ func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConne
 		"p_repo_name":            repo,
 		"p_name":                 name,
 		"p_root_dir":             rootDir,
+		"p_branch":               branch,
 		"p_domain":               domain,
 		"p_port":                 port,
 	})
@@ -89,13 +91,14 @@ func (s *SupabaseStore) CreateGithubService(userId, projectId, name, githubConne
 	return res, nil
 }
 
-func (s *SupabaseStore) UpdateGithubService(id, userId, name string, domain *string, port int32) (GithubServicesTable, error) {
+func (s *SupabaseStore) UpdateGithubService(id, userId, name string, domain *string, port int32, branch *string) (GithubServicesTable, error) {
 	result := s.cli.Rpc("update_github_service", "", map[string]interface{}{
 		"p_id":            id,
 		"p_user_id":       userId,
 		"p_name":          name,
 		"p_port":          port,
 		"p_public_domain": domain,
+		"p_branch":        branch,
 	})
 
 	var pgErr PostgrestError

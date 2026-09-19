@@ -34,6 +34,7 @@ function NewGithubServicePage() {
   const [repoId, setRepoId] = useState("");
   const [port, setPort] = useState("3000");
   const [rootDir, setRootDir] = useState("");
+  const [branch, setBranch] = useState("");
   const [domain, setDomain] = useState("");
   const [env, setEnv] = useState("");
   const [filter, setFilter] = useState("");
@@ -89,6 +90,7 @@ function NewGithubServicePage() {
             port: Number(port),
             domain: payloadDomain,
             root_dir: rootDir.trim() || ".",
+            branch: branch.trim() || "main",
             env,
           },
           { onSuccess: () => navigate({ to: "/projects/$projectId", params: { projectId } }) },
@@ -261,6 +263,20 @@ function NewGithubServicePage() {
       </div>
 
       <div>
+        <Label htmlFor="branch">Branch</Label>
+        <Input
+          id="branch"
+          value={branch}
+          onChange={(e) => setBranch(e.target.value)}
+          placeholder="main"
+          className="mt-2 font-mono"
+        />
+        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          Branch to build and deploy from. Pushes to this branch will auto-redeploy.
+        </p>
+      </div>
+
+      <div>
         <Label htmlFor="port">Port</Label>
         <Input
           id="port"
@@ -336,7 +352,7 @@ function NewGithubServicePage() {
 
       <p className="text-xs text-[var(--color-text-muted)]">
         Each service runs with a maximum of <code className="font-mono">{SERVICE_RESOURCE_LIMITS.cpu}</code> and{" "}
-        <code className="font-mono">{SERVICE_RESOURCE_LIMITS.memory}</code> memory. Pushes to the repo will auto-redeploy.
+        <code className="font-mono">{SERVICE_RESOURCE_LIMITS.memory}</code> memory. Pushes to the branch will auto-redeploy.
       </p>
 
 

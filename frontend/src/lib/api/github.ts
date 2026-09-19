@@ -113,6 +113,18 @@ export function useDeleteGithubService(projectId: string) {
   });
 }
 
+export function useRedeployGithubService(projectId: string, githubServiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<GithubService>(`/projects/${projectId}/github_services/${githubServiceId}/redeploy`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: githubKeys.byProject(projectId) });
+      qc.invalidateQueries({ queryKey: githubKeys.detail(githubServiceId) });
+    },
+  });
+}
+
 export function useDeleteGithubServices(projectId: string) {
   const qc = useQueryClient();
   return useMutation({

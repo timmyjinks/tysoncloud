@@ -21,6 +21,7 @@ function EditGithubServicePage() {
 
   const [name, setName] = useState("");
   const [port, setPort] = useState("");
+  const [branch, setBranch] = useState("");
   const [domain, setDomain] = useState("");
   const [env, setEnv] = useState("");
 
@@ -72,8 +73,9 @@ function EditGithubServicePage() {
       onSubmit={(e) => {
         e.preventDefault();
         const payloadDomain = toPayloadDomain(domain);
+        const trimmedBranch = branch.trim();
         updateGithubService.mutate(
-          { name, port: Number(port), domain: payloadDomain, env },
+          { name, port: Number(port), domain: payloadDomain, branch: trimmedBranch || undefined, env },
           {
             onSuccess: () =>
               navigate({
@@ -92,11 +94,26 @@ function EditGithubServicePage() {
       <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-muted)]">
         Repository <span className="font-mono text-[var(--color-text)]">{service.repo}</span> · root{" "}
         <span className="font-mono text-[var(--color-text)]">{service.root_dir}</span> cannot be changed after creation.
+        Changing the branch will rebuild and redeploy.
       </div>
 
       <div>
         <Label htmlFor="name">Service name</Label>
         <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} className="mt-2" />
+      </div>
+
+      <div>
+        <Label htmlFor="branch">Branch</Label>
+        <Input
+          id="branch"
+          value={branch}
+          onChange={(e) => setBranch(e.target.value)}
+          placeholder={service.branch || "main"}
+          className="mt-2 font-mono"
+        />
+        <p className="mt-1 text-xs text-[var(--color-text-muted)]">
+          Branch to build and deploy from. Pushes to this branch will auto-redeploy.
+        </p>
       </div>
 
       <div>

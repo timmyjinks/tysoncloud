@@ -61,8 +61,9 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		if payload.Ref != "refs/heads/main" {
-			slog.Info("webhook push: ignoring non-main branch", "ref", payload.Ref, "repo_id", payload.Repository.Id, "repo", payload.Repository.FullName)
+		pushedBranch := strings.TrimPrefix(payload.Ref, "refs/heads/")
+		if pushedBranch == "" || strings.HasPrefix(payload.Ref, "refs/tags/") {
+			slog.Info("webhook push: ignoring non-branch ref", "ref", payload.Ref, "repo_id", payload.Repository.Id, "repo", payload.Repository.FullName)
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -125,6 +126,14 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, svc := range services {
+			svcBranch := strings.TrimSpace(svc.Branch)
+			if svcBranch == "" {
+				svcBranch = "main"
+			}
+			if svcBranch != pushedBranch {
+				slog.Info("webhook push: ignoring branch mismatch", "service_id", svc.Id, "service_branch", svcBranch, "pushed_branch", pushedBranch, "repo_id", repoId)
+				continue
+			}
 			if installationId != "" && connectionInstallationId != "" {
 				conn, _ := app.Supabase.GetGithubConnectionByInstallationId(installationId)
 				if svc.GithubConnectionId != conn.Id {
@@ -151,16 +160,16 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				app.Github.AppendBuildLog(svc.Id, line)
 			}
 			emitState := func(to string) {
-				line := `[state] ` + to + ` commit=` + tag + ` repo=` + svc.RepoName + ` root_dir=` + sanitizedRootDir
+				line := `[state] ` + to + ` commit=` + tag + ` repo=` + svc.RepoName + ` branch=` + pushedBranch + ` root_dir=` + sanitizedRootDir
 				app.Github.AppendBuildLog(svc.Id, line)
-				slog.Info("github deploy state", "service_id", svc.Id, "to", to, "commit", tag, "repo", svc.RepoName, "root_dir", sanitizedRootDir)
+				slog.Info("github deploy state", "service_id", svc.Id, "to", to, "commit", tag, "repo", svc.RepoName, "branch", pushedBranch, "root_dir", sanitizedRootDir)
 			}
 			emitState("building")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatusById(svc.Id, "building"); statusErr != nil {
 				slog.Warn("failed to mark service building", "service_id", svc.Id, "err", statusErr)
 			}
 
-			builtImage, err := app.Github.CloneAndBuildWithLogs(r.Context(), cloneURL, accessToken, sanitizedRootDir, imageTag, logFn)
+			builtImage, err := app.Github.CloneAndBuildWithLogs(r.Context(), cloneURL, accessToken, sanitizedRootDir, pushedBranch, imageTag, logFn)
 			if err != nil {
 				if github.IsInfraBuildError(err) {
 					slog.Error("webhook: build failed due to infra unavailable – will retry on next push", "service_id", svc.Id, "root_dir", sanitizedRootDir, "err", err, "hint", "ensure BuildKit is running: docker compose up -d buildkit registry or BUILDKIT_HOST=docker-container://buildkit")

@@ -113,6 +113,11 @@ func (app *Application) GetGithubService(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	branch := strings.TrimSpace(svc.Branch)
+	if branch == "" {
+		branch = "main"
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(GithubServiceResponse{
 		Id:             svc.Id,
@@ -121,6 +126,7 @@ func (app *Application) GetGithubService(w http.ResponseWriter, r *http.Request)
 		Repo:           svc.RepoName,
 		RepoId:         svc.RepoId,
 		RootDir:        svc.RootDir,
+		Branch:         branch,
 		Port:           svc.Port,
 		Status:         svc.Status,
 		PublicDomain:   svc.PublicDomain,
@@ -218,6 +224,16 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	branch := strings.TrimSpace(req.Branch)
+	if branch == "" {
+		branch = "main"
+	}
+	sanitizedBranch, err := util.SanitizeBranch(branch)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error(), err)
+		return
+	}
+
 	connection, err := app.Supabase.GetGithubConnection(userId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "No GitHub connection found. Please install the GitHub App first.", err)
@@ -226,7 +242,7 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 
 	domainRequested := req.Domain != nil
 
-	res, err := app.Supabase.CreateGithubService(userId, projectId, req.Name, connection.Id, req.Repo, req.RepoId, sanitizedRootDir, req.Domain, req.Port)
+	res, err := app.Supabase.CreateGithubService(userId, projectId, req.Name, connection.Id, req.Repo, req.RepoId, sanitizedRootDir, sanitizedBranch, req.Domain, req.Port)
 	if err != nil {
 		if domainRequested && isDomainTakenError(err) {
 			writeError(w, http.StatusConflict, "That domain is already taken. Please choose a different one.", err)
@@ -253,6 +269,7 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		Repo:           res.RepoName,
 		RepoId:         res.RepoId,
 		RootDir:        res.RootDir,
+		Branch:         sanitizedBranch,
 		Port:           res.Port,
 		Status:         res.Status,
 		PublicDomain:   res.PublicDomain,
@@ -268,9 +285,9 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 			app.Github.AppendBuildLog(res.Id, line)
 		}
 		emitState := func(to string) {
-			line := `[state] ` + to + ` service=` + res.Id + ` repo=` + req.Repo + ` root_dir=` + sanitizedRootDir
+			line := `[state] ` + to + ` service=` + res.Id + ` repo=` + req.Repo + ` branch=` + sanitizedBranch + ` root_dir=` + sanitizedRootDir
 			app.Github.AppendBuildLog(res.Id, line)
-			slog.Info("github deploy state", "service_id", res.Id, "to", to, "repo", req.Repo, "root_dir", sanitizedRootDir)
+			slog.Info("github deploy state", "service_id", res.Id, "to", to, "repo", req.Repo, "branch", sanitizedBranch, "root_dir", sanitizedRootDir)
 		}
 
 		emitState("building")
@@ -293,9 +310,9 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		registryURL := app.Github.RegistryURL()
 		imageTag := app.Github.RegistryTag(registryURL, res.ResourceName, "latest")
 
-		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, imageTag, logFn)
+		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, sanitizedBranch, imageTag, logFn)
 		if err != nil {
-			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "err", err)
+			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "branch", sanitizedBranch, "err", err)
 			logFn(`[state] building failed: ` + err.Error())
 			emitState("failed")
 			if _, statusErr := app.Supabase.UpdateGithubServiceStatus(res.Id, userId, "failed"); statusErr != nil {
@@ -384,11 +401,35 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 			req.Domain = &normalized
 		}
 	}
+	var sanitizedBranch *string
+	if req.Branch != nil {
+		trimmed := strings.TrimSpace(*req.Branch)
+		if trimmed == "" {
+			writeError(w, http.StatusBadRequest, "Branch is required.", nil)
+			return
+		}
+		sb, err := util.SanitizeBranch(trimmed)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error(), err)
+			return
+		}
+		sanitizedBranch = &sb
+	}
 
 	userId := claims.Subject
 	domainRequested := req.Domain != nil
 
-	res, err := app.Supabase.UpdateGithubService(githubServiceId, userId, *req.Name, req.Domain, *req.Port)
+	existing, err := app.Supabase.GetGithubService(githubServiceId, userId)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+	oldBranch := existing.Branch
+	if strings.TrimSpace(oldBranch) == "" {
+		oldBranch = "main"
+	}
+
+	res, err := app.Supabase.UpdateGithubService(githubServiceId, userId, *req.Name, req.Domain, *req.Port, sanitizedBranch)
 	if err != nil {
 		if domainRequested && isDomainTakenError(err) {
 			writeError(w, http.StatusConflict, "That domain is already taken. Please choose a different one.", err)
@@ -410,6 +451,43 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	if req.Env != nil {
 		envStr = *req.Env
 	}
+
+	newBranch := oldBranch
+	if sanitizedBranch != nil {
+		newBranch = *sanitizedBranch
+	}
+	if res.Branch != "" {
+		newBranch = res.Branch
+	}
+
+	if sanitizedBranch != nil && *sanitizedBranch != oldBranch {
+		// Branch changed: rebuild from git asynchronously, like creation.
+		connection, connErr := app.Supabase.GetGithubConnection(userId)
+		if connErr != nil {
+			writeError(w, http.StatusInternalServerError, "We saved your changes, but couldn't rebuild from the new branch. Use Redeploy to retry.", connErr)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(GithubServiceResponse{
+			Id:             res.Id,
+			ProjectId:      res.ProjectId,
+			Name:           res.Name,
+			Repo:           res.RepoName,
+			RepoId:         res.RepoId,
+			RootDir:        res.RootDir,
+			Branch:         newBranch,
+			Port:           res.Port,
+			Status:         res.Status,
+			PublicDomain:   res.PublicDomain,
+			InternalDomain: res.PrivateDomain,
+			CreatedAt:      res.CreatedAt,
+		})
+
+		go app.buildGithubServiceFromGit(userId, res, connection.InstallationId, newBranch, envStr)
+		return
+	}
+
 	registryURLUpdate := app.Github.RegistryURL()
 	fallbackImage := app.Github.RegistryTag(registryURLUpdate, res.ResourceName, "latest")
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
@@ -440,12 +518,169 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 		Repo:           res.RepoName,
 		RepoId:         res.RepoId,
 		RootDir:        res.RootDir,
+		Branch:         newBranch,
 		Port:           res.Port,
 		Status:         res.Status,
 		PublicDomain:   res.PublicDomain,
 		InternalDomain: res.PrivateDomain,
 		CreatedAt:      res.CreatedAt,
 	})
+}
+
+func (app *Application) buildGithubServiceFromGit(userId string, svc store.GithubServicesTable, installationId int64, branch, envStr string) {
+	buildCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	sanitizedRootDir := svc.RootDir
+	if v, err := util.SanitizeRootDir(svc.RootDir); err == nil {
+		sanitizedRootDir = v
+	}
+	if strings.TrimSpace(branch) == "" {
+		branch = "main"
+	}
+
+	logFn := func(line string) {
+		app.Github.AppendBuildLog(svc.Id, line)
+	}
+	emitState := func(to string) {
+		line := `[state] ` + to + ` service=` + svc.Id + ` repo=` + svc.RepoName + ` branch=` + branch + ` root_dir=` + sanitizedRootDir
+		app.Github.AppendBuildLog(svc.Id, line)
+		slog.Info("github deploy state", "service_id", svc.Id, "to", to, "repo", svc.RepoName, "branch", branch, "root_dir", sanitizedRootDir)
+	}
+
+	emitState("building")
+	if _, statusErr := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "building"); statusErr != nil {
+		slog.Warn("failed to mark github service building", "service_id", svc.Id, "err", statusErr)
+	}
+
+	cloneURL := fmt.Sprintf("https://github.com/%s.git", svc.RepoName)
+	accessToken, err := app.Github.GetInstallationToken(buildCtx, strconv.FormatInt(installationId, 10))
+	if err != nil {
+		slog.Error("failed to get installation token", "service_id", svc.Id, "err", err)
+		logFn(`[build] failed to get installation token: ` + err.Error())
+		emitState("failed")
+		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "failed"); statusErr != nil {
+			slog.Error("failed to mark github service failed after token error", "service_id", svc.Id, "err", statusErr)
+		}
+		return
+	}
+
+	registryURL := app.Github.RegistryURL()
+	imageTag := app.Github.RegistryTag(registryURL, svc.ResourceName, "latest")
+
+	image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, branch, imageTag, logFn)
+	if err != nil {
+		slog.Error("failed to build github service image", "service_id", svc.Id, "branch", branch, "root_dir", sanitizedRootDir, "err", err)
+		logFn(`[state] building failed: ` + err.Error())
+		emitState("failed")
+		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "failed"); statusErr != nil {
+			slog.Error("failed to mark github service failed after build error", "service_id", svc.Id, "err", statusErr)
+		}
+		return
+	}
+
+	emitState("deploying")
+	if _, statusErr := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "deploying"); statusErr != nil {
+		slog.Warn("failed to mark github service deploying", "service_id", svc.Id, "err", statusErr)
+	}
+
+	env := util.ParseEnv(envStr)
+	if reqEnvEmpty := strings.TrimSpace(envStr) == ""; reqEnvEmpty {
+		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{
+			Namespace: "proj-" + svc.ProjectId,
+			Name:      svc.ResourceName,
+		}); envErr == nil && len(existingEnv) > 0 {
+			env = map[string][]byte{}
+			for k, v := range existingEnv {
+				env[k] = []byte(v)
+			}
+		}
+	}
+
+	if err := app.Deploy.CreateService(buildCtx, deploy.Service{
+		Namespace: "proj-" + svc.ProjectId,
+		Name:      svc.ResourceName,
+		Hostname:  svc.PublicDomain,
+		Env:       env,
+		Port:      svc.Port,
+		Image:     image,
+	}); err != nil {
+		slog.Error("failed to deploy github service", "service_id", svc.Id, "err", err)
+		logFn(`[state] deploying failed: ` + err.Error())
+		emitState("failed")
+		if _, statusErr := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "failed"); statusErr != nil {
+			slog.Error("failed to mark github service failed after deploy error", "service_id", svc.Id, "err", statusErr)
+		}
+		return
+	}
+
+	emitState("running")
+	if _, err := app.Supabase.UpdateGithubServiceStatus(svc.Id, userId, "running"); err != nil {
+		slog.Error("failed to mark github service running after successful deploy", "service_id", svc.Id, "err", err)
+	}
+	logFn(`[state] running image=` + image)
+}
+
+func (app *Application) RedeployGithubService(w http.ResponseWriter, r *http.Request) {
+	projectId := mux.Vars(r)["project_id"]
+	if projectId == "" {
+		writeError(w, http.StatusBadRequest, "A project ID is required.", nil)
+		return
+	}
+	githubServiceId := mux.Vars(r)["github_service_id"]
+	if githubServiceId == "" {
+		writeError(w, http.StatusBadRequest, "A service ID is required.", nil)
+		return
+	}
+
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, msgUnauthorized, nil)
+		return
+	}
+	userId := claims.Subject
+
+	svc, err := app.Supabase.GetGithubService(githubServiceId, userId)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+
+	status := strings.ToLower(strings.TrimSpace(svc.Status))
+	if status == "building" || status == "deploying" {
+		writeError(w, http.StatusConflict, "That service is already deploying. Please wait for it to finish.", nil)
+		return
+	}
+
+	connection, err := app.Supabase.GetGithubConnection(userId)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "No GitHub connection found. Please install the GitHub App first.", err)
+		return
+	}
+
+	branch := strings.TrimSpace(svc.Branch)
+	if branch == "" {
+		branch = "main"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(GithubServiceResponse{
+		Id:             svc.Id,
+		ProjectId:      svc.ProjectId,
+		Name:           svc.Name,
+		Repo:           svc.RepoName,
+		RepoId:         svc.RepoId,
+		RootDir:        svc.RootDir,
+		Branch:         branch,
+		Port:           svc.Port,
+		Status:         "building",
+		PublicDomain:   svc.PublicDomain,
+		InternalDomain: svc.PrivateDomain,
+		CreatedAt:      svc.CreatedAt,
+	})
+
+	go app.buildGithubServiceFromGit(userId, svc, connection.InstallationId, branch, "")
 }
 
 func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Request) {
@@ -590,7 +825,7 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 		lines := make(chan string, 64)
 		subID, ch, snap := app.Github.SubscribeBuildLogs(svc.Id)
 		defer app.Github.UnsubscribeBuildLogs(svc.Id, subID)
-		stateLine := `[state] ` + svc.Status + ` repo=` + svc.RepoName + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
+		stateLine := `[state] ` + svc.Status + ` repo=` + svc.RepoName + ` branch=` + svc.Branch + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
 		go func() {
 			defer close(lines)
 			select {
@@ -679,6 +914,10 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 func ToGithubServicesResponse(tables []store.GithubServicesTable) []GithubServiceResponse {
 	out := []GithubServiceResponse{}
 	for _, t := range tables {
+		branch := t.Branch
+		if strings.TrimSpace(branch) == "" {
+			branch = "main"
+		}
 		out = append(out, GithubServiceResponse{
 			Id:             t.Id,
 			ProjectId:      t.ProjectId,
@@ -686,6 +925,7 @@ func ToGithubServicesResponse(tables []store.GithubServicesTable) []GithubServic
 			Repo:           t.RepoName,
 			RepoId:         t.RepoId,
 			RootDir:        t.RootDir,
+			Branch:         branch,
 			Port:           t.Port,
 			Status:         t.Status,
 			PublicDomain:   t.PublicDomain,

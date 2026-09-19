@@ -9,6 +9,7 @@ import (
 var nameRegex = regexp.MustCompile(`^[A-Za-z-]+$`)
 var envRegex = regexp.MustCompile(`\A(?:[A-Za-z_][A-Za-z0-9_]*=[^\n]*)*(?:\n[A-Za-z_][A-Za-z0-9_]*=[^\n]*)*\z`)
 var domainLabelRegex = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
+var branchRegex = regexp.MustCompile(`^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$`)
 
 func validateName(name string) (bool, error) {
 	if len(name) > 24 {
@@ -65,6 +66,28 @@ func ParseEnv(env string) map[string][]byte {
 	}
 
 	return result
+}
+
+func SanitizeBranch(raw string) (string, error) {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return "", fmt.Errorf("branch is required")
+	}
+	if len(v) > 250 {
+		return "", fmt.Errorf("branch must be 250 characters or fewer")
+	}
+	if strings.Contains(v, "..") || strings.Contains(v, " ") {
+		return "", fmt.Errorf("branch %q is not valid", raw)
+	}
+	for _, bad := range []string{"~", "^", ":", "?", "*", "[", "\\", "@{", ".lock"} {
+		if strings.Contains(v, bad) {
+			return "", fmt.Errorf("branch %q contains invalid characters", raw)
+		}
+	}
+	if !branchRegex.MatchString(v) {
+		return "", fmt.Errorf("branch %q is not valid (use letters, numbers, '.', '_', '-' and '/' separators)", raw)
+	}
+	return v, nil
 }
 
 func SanitizeRootDir(raw string) (string, error) {

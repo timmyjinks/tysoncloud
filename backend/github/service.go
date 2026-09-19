@@ -169,11 +169,11 @@ func (s *Service) VerifyWebhookSignature(signature string, body []byte) bool {
 	return hmac.Equal([]byte(expected), []byte(hexSig))
 }
 
-func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, rootDir, imageTag string) (string, error) {
-	return s.CloneAndBuildWithLogs(ctx, cloneURL, accessToken, rootDir, imageTag, nil)
+func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, rootDir, branch, imageTag string) (string, error) {
+	return s.CloneAndBuildWithLogs(ctx, cloneURL, accessToken, rootDir, branch, imageTag, nil)
 }
 
-func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessToken, rootDir, imageTag string, logFn func(string)) (string, error) {
+func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessToken, rootDir, branch, imageTag string, logFn func(string)) (string, error) {
 	emit := func(msg string) {
 		slog.Info(msg)
 		if logFn != nil {
@@ -192,8 +192,8 @@ func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessTok
 		}
 	}
 
-	emit(fmt.Sprintf("[state] building: cloning %s root_dir=%s", cloneURL, rootDir))
-	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, logFn)
+	emit(fmt.Sprintf("[state] building: cloning %s root_dir=%s branch=%s", cloneURL, rootDir, branch))
+	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, branch, logFn)
 	if err != nil {
 		emitErr("git clone failed", err, "")
 		return "", err
@@ -235,11 +235,11 @@ func resolveBuildContext(cloneDir, rootDir string) (string, error) {
 	return ctx, nil
 }
 
-func cloneRepo(ctx context.Context, cloneURL, accessToken string) (string, error) {
-	return cloneRepoWithLogs(ctx, cloneURL, accessToken, nil)
+func cloneRepo(ctx context.Context, cloneURL, accessToken, branch string) (string, error) {
+	return cloneRepoWithLogs(ctx, cloneURL, accessToken, branch, nil)
 }
 
-func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken string, logFn func(string)) (string, error) {
+func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken, branch string, logFn func(string)) (string, error) {
 	parent, err := os.MkdirTemp("", "gh-clone-*")
 	if err != nil {
 		return "", fmt.Errorf("create temp dir: %w", err)
@@ -251,7 +251,12 @@ func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken string, logFn 
 		url = strings.Replace(cloneURL, "https://", "https://x-access-token:"+accessToken+"@", 1)
 	}
 
-	cmd := exec.CommandContext(ctx, "git", "clone", "--depth", "1", url, parent)
+	args := []string{"clone", "--depth", "1"}
+	if strings.TrimSpace(branch) != "" {
+		args = append(args, "--branch", strings.TrimSpace(branch))
+	}
+	args = append(args, url, parent)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Env = os.Environ()
 	out, err := runCmdWithLogs(cmd, logFn)
 	if err != nil {

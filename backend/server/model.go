@@ -103,6 +103,7 @@ type GithubServiceResponse struct {
 	Repo           string            `json:"repo_name"`
 	RepoId         int64             `json:"repo_id"`
 	RootDir        string            `json:"root_dir"`
+	Branch         string            `json:"branch"`
 	Port           int32             `json:"port"`
 	Status         string            `json:"status"`
 	PublicDomain   string            `json:"public_domain"`
@@ -118,6 +119,7 @@ type GithubServiceCreateRequest struct {
 	Port    int32   `json:"port"`
 	Domain  *string `json:"domain"`
 	RootDir string  `json:"root_dir"`
+	Branch  string  `json:"branch"`
 	Env     string  `json:"env"`
 }
 
@@ -126,6 +128,7 @@ type GithubServiceUpdateRequest struct {
 	Port   *int32  `json:"port"`
 	Domain *string `json:"domain"`
 	Env    *string `json:"env"`
+	Branch *string `json:"branch"`
 }
 
 type GithubServiceDeleteRequest struct {

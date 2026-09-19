@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { MoreVertical, Pencil, Terminal, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, RefreshCw, Terminal, Trash2 } from "lucide-react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useDeleteGithubService, useGithubService } from "@/lib/api/github";
+import { useDeleteGithubService, useGithubService, useRedeployGithubService } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { ResourceMetaCard } from "@/components/resource-meta-card";
 import { CopyButton } from "@/components/copy-button";
@@ -22,8 +22,11 @@ function GithubServiceDetail() {
   const navigate = useNavigate();
   const { data: service, isLoading, error, refetch } = useGithubService(githubServiceId);
   const deleteGithubService = useDeleteGithubService(projectId);
+  const redeployGithubService = useRedeployGithubService(projectId, githubServiceId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const isDeploying =
+    service?.status === "building" || service?.status === "deploying" || redeployGithubService.isPending;
 
   if (error) {
     return (
@@ -70,6 +73,17 @@ function GithubServiceDetail() {
             View logs
           </DropdownMenuItem>
           <DropdownMenuItem
+            onClick={() => {
+              if (isDeploying) return;
+              redeployGithubService.mutate(undefined, {
+                onSuccess: () => setLogsOpen(true),
+              });
+            }}
+          >
+            <RefreshCw className="h-4 w-4" />
+            {isDeploying ? "Redeploying…" : "Redeploy"}
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onClick={() =>
               navigate({
                 to: "/projects/$projectId/github_services/$githubServiceId/edit",
@@ -89,6 +103,11 @@ function GithubServiceDetail() {
       </div>
 
       <div className="mt-4">
+        {redeployGithubService.error && (
+          <div className="mb-4">
+            <ErrorBanner message={getErrorMessage(redeployGithubService.error)} />
+          </div>
+        )}
         <ResourceMetaCard
           meta={[
             { label: "Status", value: service.status, status: true },
@@ -99,6 +118,7 @@ function GithubServiceDetail() {
               mono: true,
               href: `https://github.com/${service.repo_name}`,
             },
+            { label: "Branch", value: service.branch || "main", mono: true },
             { label: "Root directory", value: service.root_dir || ".", mono: true },
             {
               label: "Public domain",

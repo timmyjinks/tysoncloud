@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@clerk/clerk-react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCreateGithubConnection } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { ErrorBanner } from "@/components/error-banner";
@@ -16,69 +15,88 @@ export const Route = createFileRoute("/github/callback")({
   component: GithubCallbackPage,
 });
 
-function readStoredReturnTo(): string | null {
-  try {
-    return window.localStorage.getItem("tysoncloud:github:returnTo");
-  } catch {
-    return null;
-  }
-}
-
-function clearStoredReturnTo() {
-  try {
-    window.localStorage.removeItem("tysoncloud:github:returnTo");
-  } catch {}
-}
-
-function resolveReturnTo(state: string | undefined, stored: string | null): string {
-  const isSafePath = (p: string) => p.startsWith("/") && !p.startsWith("//");
-  if (state && isSafePath(state)) return state;
-  if (state && state !== "dashboard" && !state.includes("/") && !state.includes(".")) {
-    return `/projects/${state}`;
-  }
-  if (stored && isSafePath(stored)) return stored;
-  return "/dashboard";
-}
-
 function GithubCallbackPage() {
   const navigate = useNavigate();
-  const qc = useQueryClient();
   const { installation_id, state } = Route.useSearch();
   const createConnection = useCreateGithubConnection();
   const { isLoaded, isSignedIn } = useAuth();
-  const [storedReturnTo] = useState<string | null>(() => readStoredReturnTo());
 
-  const returnTo = resolveReturnTo(state, storedReturnTo);
+  const hasOpener = () => {
+    try {
+      return !!window.opener && !window.opener.closed;
+    } catch {
+      return false;
+    }
+  };
 
-  const goBack = () => {
-    const projectMatch = returnTo.match(/^\/projects\/([^/]+)\/github_services\/new$/);
-    if (projectMatch?.[1]) {
-      navigate({ to: "/projects/$projectId/github_services/new", params: { projectId: projectMatch[1] } });
-      return;
+  const isPopup = () => {
+    try {
+      return hasOpener() || window.name === "tysoncloud-github-install";
+    } catch {
+      return hasOpener();
     }
-    const projectOnly = returnTo.match(/^\/projects\/([^/]+)$/);
-    if (projectOnly?.[1]) {
-      navigate({ to: "/projects/$projectId", params: { projectId: projectOnly[1] } });
-      return;
-    }
-    navigate({ to: "/dashboard" });
+  };
+
+  const forceClose = () => {
+    try {
+      window.close();
+    } catch {}
+    try {
+      window.self.close();
+    } catch {}
+    try {
+      window.top?.close();
+    } catch {}
+  };
+
+  const notifyOpener = (installationId: string) => {
+    try {
+      if (hasOpener()) {
+        window.opener.postMessage(
+          { type: "github-app-installed", installation_id: installationId, state },
+          "*",
+        );
+        return true;
+      }
+    } catch {}
+    return false;
   };
 
   useEffect(() => {
+    if (!installation_id) return;
+    if (hasOpener()) {
+      notifyOpener(installation_id);
+      forceClose();
+    }
+  }, [installation_id, state]);
+
+  useEffect(() => {
+    if (hasOpener()) return;
     if (!isLoaded || !isSignedIn || !installation_id) return;
     if (createConnection.isSuccess || createConnection.isPending || createConnection.isError) return;
     createConnection.mutate(
       { installation_id: Number(installation_id) },
       {
         onSuccess: () => {
-          clearStoredReturnTo();
-          qc.invalidateQueries({ queryKey: ["github"] });
-          goBack();
+          if (isPopup()) {
+            forceClose();
+            setTimeout(() => forceClose(), 200);
+            return;
+          }
+          const projectId = state;
+          if (projectId) {
+            navigate({
+              to: "/projects/$projectId",
+              params: { projectId },
+              search: {} as never,
+            });
+          } else {
+            navigate({ to: "/dashboard" });
+          }
         },
       },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, isSignedIn, installation_id]);
+  }, [isLoaded, isSignedIn, installation_id, state, createConnection, navigate]);
 
   if (!installation_id) {
     return (
@@ -90,6 +108,76 @@ function GithubCallbackPage() {
         <Button className="mt-6" onClick={() => navigate({ to: "/dashboard" })}>
           Back to dashboard
         </Button>
+      </main>
+    );
+  }
+
+  if (hasOpener()) {
+    return (
+      <main className="mx-auto max-w-xl px-4 py-16 text-center">
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-text)]">Connecting GitHub…</h1>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">Installation ID: {installation_id}</p>
+        <p className="mt-4 text-sm text-[var(--color-text-faint)]">Finishing in parent window…</p>
+        <p className="mt-2 text-sm text-[var(--color-text-faint)]">If this window does not close, click below.</p>
+        <Button
+          className="mt-6"
+          onClick={() => {
+            notifyOpener(installation_id!);
+            forceClose();
+          }}
+        >
+          Close window
+        </Button>
+      </main>
+    );
+  }
+
+  if (isPopup()) {
+    if (!isLoaded) {
+      return (
+        <main className="mx-auto max-w-xl px-4 py-16 text-center">
+          <h1 className="font-display text-2xl font-semibold text-[var(--color-text)]">Connecting GitHub…</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Installation ID: {installation_id}</p>
+          <p className="mt-4 text-sm text-[var(--color-text-faint)]">Loading…</p>
+          <Button className="mt-6" onClick={() => forceClose()}>
+            Close window
+          </Button>
+        </main>
+      );
+    }
+    if (!isSignedIn) {
+      return (
+        <main className="mx-auto max-w-xl px-4 py-16 text-center">
+          <h1 className="font-display text-2xl font-semibold text-[var(--color-text)]">Sign in required</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Please sign in to complete the GitHub connection.</p>
+          <Button className="mt-6" onClick={() => navigate({ to: "/sign-in" })}>
+            Sign in
+          </Button>
+        </main>
+      );
+    }
+    return (
+      <main className="mx-auto max-w-xl px-4 py-16 text-center">
+        <h1 className="font-display text-2xl font-semibold text-[var(--color-text)]">Connecting GitHub…</h1>
+        <p className="mt-2 text-sm text-[var(--color-text-muted)]">Installation ID: {installation_id}</p>
+        {createConnection.isPending && <p className="mt-4 text-sm text-[var(--color-text-faint)]">Saving connection…</p>}
+        {createConnection.isSuccess && <p className="mt-4 text-sm text-[var(--color-text-faint)]">Connected. Closing…</p>}
+        {createConnection.isSuccess && (
+          <Button className="mt-6" onClick={() => forceClose()}>
+            Close window
+          </Button>
+        )}
+        {createConnection.isError && (
+          <ErrorBanner className="mt-6" message={getErrorMessage(createConnection.error)} />
+        )}
+        {createConnection.isError && (
+          <div className="mt-4 flex justify-center gap-2">
+            <Button onClick={() => createConnection.mutate({ installation_id: Number(installation_id) })}>Retry</Button>
+            <Button variant="outline" onClick={() => forceClose()}>
+              Close window
+            </Button>
+          </div>
+        )}
       </main>
     );
   }

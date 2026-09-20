@@ -84,7 +84,7 @@ spec:
                   key: SUPABASE_API_KEY
                   name: tysoncloud-backend-dev
             - name: GITHUB_APP_SLUG
-              value: tysoncloud
+              value: GITHUB_APP_SLUG
             - name: GITHUB_APP_ID
               valueFrom:
                 secretKeyRef:

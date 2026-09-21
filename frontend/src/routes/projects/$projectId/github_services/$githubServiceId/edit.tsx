@@ -92,7 +92,7 @@ function EditGithubServicePage() {
       cancelTo="/projects/$projectId/github_services/$githubServiceId"
     >
       <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-sm text-[var(--color-text-muted)]">
-        Repository <span className="font-mono text-[var(--color-text)]">{service.repo}</span> · root{" "}
+        Repository <span className="font-mono text-[var(--color-text)]">{service.repo_name}</span> · root{" "}
         <span className="font-mono text-[var(--color-text)]">{service.root_dir}</span> cannot be changed after creation.
         Changing the branch will rebuild and redeploy.
       </div>

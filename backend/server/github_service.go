@@ -310,7 +310,7 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		registryURL := app.Github.RegistryURL()
 		imageTag := app.Github.RegistryTag(registryURL, res.ResourceName, "latest")
 
-		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, sanitizedBranch, imageTag, logFn)
+		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, sanitizedBranch, imageTag, logFn, util.ParseEnv(req.Env))
 		if err != nil {
 			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "branch", sanitizedBranch, "err", err)
 			logFn(`[state] building failed: ` + err.Error())
@@ -568,7 +568,22 @@ func (app *Application) buildGithubServiceFromGit(userId string, svc store.Githu
 	registryURL := app.Github.RegistryURL()
 	imageTag := app.Github.RegistryTag(registryURL, svc.ResourceName, "latest")
 
-	image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, branch, imageTag, logFn)
+	// Resolve the effective env BEFORE the build so the image bakes the same
+	// vars it runs with. Ephemeral — never stored beyond the K8s secret.
+	buildEnv := util.ParseEnv(envStr)
+	if strings.TrimSpace(envStr) == "" {
+		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{
+			Namespace: "proj-" + svc.ProjectId,
+			Name:      svc.ResourceName,
+		}); envErr == nil && len(existingEnv) > 0 {
+			buildEnv = map[string][]byte{}
+			for k, v := range existingEnv {
+				buildEnv[k] = []byte(v)
+			}
+		}
+	}
+
+	image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, branch, imageTag, logFn, buildEnv)
 	if err != nil {
 		slog.Error("failed to build github service image", "service_id", svc.Id, "branch", branch, "root_dir", sanitizedRootDir, "err", err)
 		logFn(`[state] building failed: ` + err.Error())
@@ -584,18 +599,7 @@ func (app *Application) buildGithubServiceFromGit(userId string, svc store.Githu
 		slog.Warn("failed to mark github service deploying", "service_id", svc.Id, "err", statusErr)
 	}
 
-	env := util.ParseEnv(envStr)
-	if reqEnvEmpty := strings.TrimSpace(envStr) == ""; reqEnvEmpty {
-		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{
-			Namespace: "proj-" + svc.ProjectId,
-			Name:      svc.ResourceName,
-		}); envErr == nil && len(existingEnv) > 0 {
-			env = map[string][]byte{}
-			for k, v := range existingEnv {
-				env[k] = []byte(v)
-			}
-		}
-	}
+	env := buildEnv
 
 	if err := app.Deploy.CreateService(buildCtx, deploy.Service{
 		Namespace: "proj-" + svc.ProjectId,
@@ -701,14 +705,24 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Snapshot previews BEFORE the DB delete: the namespace is shared per
+	// repo+PR, so remove only this service's K8s objects from it and delete
+	// the namespace only when no sibling previews remain. No env values are
+	// stored in preview_environments, so nothing secret to purge.
+	previewsBefore, _ := app.Supabase.GetPreviewEnvironmentsByService(githubServiceId)
+	svcBefore, _ := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
+
 	if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
 		return
 	}
 
+	cleanupSharedPreviewObjects(r.Context(), app, previewsBefore)
+	_ = app.Supabase.DeletePreviewEnvironmentsByService(githubServiceId)
+
 	resourceName := "svc-" + githubServiceId
-	if svc, err := app.Supabase.GetGithubServiceById(githubServiceId); err == nil && svc.ResourceName != "" {
-		resourceName = svc.ResourceName
+	if svcBefore.ResourceName != "" {
+		resourceName = svcBefore.ResourceName
 	}
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
@@ -718,6 +732,54 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.WriteHeader(204)
+}
+
+// cleanupSharedPreviewObjects removes one service's preview K8s objects from
+// the shared per-repo+PR namespace and deletes the namespace itself only
+// when no remaining previews reference it. Best-effort — a missing object
+// just means that preview never deployed. Deploy.DeleteService is idempotent
+// (ignores NotFound for Secret/PVC/HPA/Deployment/Service/HTTPRoute).
+func cleanupSharedPreviewObjects(ctx context.Context, app *Application, previews []store.PreviewEnvironmentsTable) {
+	for _, p := range previews {
+		if strings.TrimSpace(p.Namespace) == "" || strings.TrimSpace(p.ResourceName) == "" {
+			continue
+		}
+		if err := app.Deploy.DeleteService(ctx, deploy.Service{
+			Namespace: p.Namespace,
+			Name:      p.ResourceName,
+		}); err != nil {
+			slog.Warn("failed to clean up preview objects", "service_id", p.GithubServiceId, "namespace", p.Namespace, "name", p.ResourceName, "err", err)
+		}
+	}
+	seen := map[string]store.PreviewEnvironmentsTable{}
+	for _, p := range previews {
+		if strings.TrimSpace(p.Namespace) == "" {
+			continue
+		}
+		seen[p.Namespace] = p
+	}
+	for namespace, sample := range seen {
+		remaining, err := app.Supabase.GetPreviewEnvironmentsByRepoPR(sample.RepoId, sample.PrNumber)
+		if err != nil {
+			slog.Warn("failed to check remaining previews, keeping namespace", "namespace", namespace, "err", err)
+			continue
+		}
+		stillReferenced := false
+		for _, r := range remaining {
+			if strings.TrimSpace(r.Namespace) == namespace {
+				stillReferenced = true
+				break
+			}
+		}
+		if stillReferenced {
+			continue
+		}
+		if err := app.Deploy.DeleteProject(ctx, namespace); err != nil {
+			slog.Warn("failed to clean up empty preview namespace", "namespace", namespace, "err", err)
+		} else {
+			slog.Info("preview cleanup: deleted empty namespace", "namespace", namespace)
+		}
+	}
 }
 
 func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Request) {
@@ -747,13 +809,19 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, id := range req.Ids {
+		previewsBefore, _ := app.Supabase.GetPreviewEnvironmentsByService(id)
+		svcBefore, _ := app.Supabase.GetGithubService(id, claims.Subject)
 		if err := app.Supabase.DeleteGithubService(id, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: id, Error: "Couldn't delete the service."})
 			continue
 		}
+		// Cascade preview objects for this service only (best-effort);
+		// the shared namespace goes away only when its last preview does.
+		cleanupSharedPreviewObjects(r.Context(), app, previewsBefore)
+		_ = app.Supabase.DeletePreviewEnvironmentsByService(id)
 		resourceName := "svc-" + id
-		if svc, err := app.Supabase.GetGithubServiceById(id); err == nil && svc.ResourceName != "" {
-			resourceName = svc.ResourceName
+		if svcBefore.ResourceName != "" {
+			resourceName = svcBefore.ResourceName
 		}
 		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 			Namespace: "proj-" + projectId,

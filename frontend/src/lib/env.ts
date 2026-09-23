@@ -15,9 +15,20 @@ function readBuildEnv(): Partial<RuntimeEnv> {
 
 let cache: RuntimeEnv | null = null;
 
+const RUNTIME_FETCH_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Resolve env once at startup: build-time values win, the server function
  * (`GET` → pod env on the Start server, e.g. from k8s Secrets) fills blanks.
+ * A hanging server-fn fetch becomes a readable error (never infinite white).
  * Throws if anything is still missing — fail fast instead of firing
  * unauthenticated requests at an empty URL.
  */
@@ -25,11 +36,15 @@ export async function resolveEnv(): Promise<RuntimeEnv> {
   if (cache) return cache;
 
   const build = readBuildEnv();
+  const needsRuntime = !build.clerkPublishableKey || !build.apiUrl;
+  // Proves the loader ran and whether a runtime fetch was attempted.
+  console.info(`[env] resolving (runtime fetch: ${needsRuntime ? "yes" : "not needed"})`);
   let runtime: Partial<RuntimeEnv> = {};
-  if (!build.clerkPublishableKey || !build.apiUrl) {
+  if (needsRuntime) {
     try {
-      runtime = await getRuntimeEnv();
-    } catch {
+      runtime = await withTimeout(getRuntimeEnv(), RUNTIME_FETCH_TIMEOUT_MS, "runtime env fetch");
+    } catch (err) {
+      console.warn("[env] runtime fetch failed, continuing with build-time values:", err);
       runtime = {};
     }
   }

@@ -13,9 +13,9 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React, { Suspense, useEffect } from "react";
+import React, { useEffect } from "react";
 import { authRef, type AuthState } from "@/lib/auth-ref";
-import { useEnv } from "@/lib/env";
+import { useRuntimeEnv } from "@/lib/env";
 
 type RouterContext = {
   auth: AuthState | null;
@@ -24,9 +24,7 @@ type RouterContext = {
 export const Route = createRootRouteWithContext<RouterContext>()({
   // Document shell (always rendered, incl. SPA shell prerender).
   shellComponent: RootDocument,
-  // App below resolves env via Suspense — safe for the prerendered shell,
-  // which renders the Suspense fallback instead of providers.
-  component: RootLayout,
+  component: RootComponent,
   beforeLoad: () => ({ auth: authRef.current }),
   errorComponent: EnvError,
 });
@@ -48,17 +46,13 @@ function AuthSync() {
   return null;
 }
 
-function RootLayout() {
-  return (
-    <Suspense fallback={<FullPageLoading />}>
-      <BootstrappedApp />
-    </Suspense>
-  );
-}
-
-function BootstrappedApp() {
-  const env = useEnv();
+function RootComponent() {
+  // Fetched client-side after mount: never runs during SSR/prerender, so the
+  // shell builds without secrets and the browser always gets live server env.
+  const { env, error } = useRuntimeEnv();
   const router = useRouter();
+  if (error) return <EnvError error={error} reset={() => window.location.reload()} />;
+  if (!env) return <FullPageLoading />;
   return (
     <ClerkErrorBoundary>
       <ClerkProvider

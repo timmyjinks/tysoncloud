@@ -38,6 +38,10 @@ export async function resolveEnv(): Promise<RuntimeEnv> {
     clerkPublishableKey: build.clerkPublishableKey || runtime.clerkPublishableKey || "",
     apiUrl: build.apiUrl || (runtime.apiUrl?.replace(/\/+$/, "") ?? "") || "",
   };
+  // Logs which layer won per key: build wins, runtime fills blanks.
+  console.info(
+    `[env] sources: clerk=${build.clerkPublishableKey ? "build" : runtime.clerkPublishableKey ? "runtime" : "MISSING"}, apiUrl=${build.apiUrl ? "build" : runtime.apiUrl ? "runtime" : "MISSING"}`,
+  );
   if (!merged.clerkPublishableKey) {
     throw new Error(
       "Missing Clerk publishable key — bake VITE_CLERK_PUBLISHABLE_KEY at build time or set it on the server.",

@@ -41,9 +41,22 @@ cp .env.example .env.local   # fill in VITE_CLERK_PUBLISHABLE_KEY, VITE_API_URL
 pnpm dev
 ```
 
-`pnpm dev` / `pnpm build` run the TanStack Router Vite plugin, which
+`pnpm dev` / `pnpm build` run the TanStack Start Vite plugin, which
 generates `src/routeTree.gen.ts` from the files in `src/routes/` — it's
 gitignored and shouldn't be hand-edited.
+
+## Env loading
+
+Two layers, per key first-non-empty wins:
+
+1. **Build time** — `VITE_CLERK_PUBLISHABLE_KEY` / `VITE_API_URL` passed as
+   Docker build-args, baked via `import.meta.env`. Primary source.
+2. **Runtime** — the Start server function `getRuntimeEnv`
+   (`src/lib/env.functions.ts`) reads the container env (e.g. k8s Secrets)
+   per-request and fills blanks. Single source module: `src/lib/env.ts`.
+
+`pnpm start` runs the Nitro server (`node .output/server/index.mjs`).
+Check the browser console `[env]` line to see which layer won per key.
 
 ## Structure
 
@@ -64,10 +77,14 @@ src/
   catches Clerk's own sub-steps — `factor-one`, `reset-password`,
   `sso-callback`, etc. Clerk reads the URL itself to know which step to
   render, so the splat just needs to mount the same `<SignIn/>`.
-- The router only mounts inside `<ClerkLoaded>` (see `main.tsx`). Mounting
-  it earlier means `useAuth().isSignedIn` is briefly `false` while Clerk
-  is still checking the session, which sends a signed-in user to
-  `/sign-in`, which then bounces them right back — a redirect loop.
+- Start owns the `<RouterProvider>`, so the router can't mount inside
+  `<ClerkLoaded>` anymore. Instead `<AuthSync>` (`src/routes/__root.tsx`)
+  publishes `useAuth()` into a module ref that root `beforeLoad` exposes
+  as router context; guards treat `null` (not loaded yet) as "unknown" and
+  let the navigation through, then `AuthSync` calls `router.invalidate()`
+  once Clerk is loaded so guards re-run with real auth. Without the
+  null-tolerance, a signed-in user would be sent to `/sign-in` and bounce
+  right back — a redirect loop.
 - `ClerkProvider` gets `routerPush`/`routerReplace` wired to
   `router.navigate` so Clerk's internal navigations use the SPA router
   instead of falling back to full `window.location` reloads.

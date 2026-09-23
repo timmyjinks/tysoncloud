@@ -13,7 +13,7 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { authRef, type AuthState } from "@/lib/auth-ref";
 import { resolveEnv } from "@/lib/env";
 
@@ -53,7 +53,8 @@ function RootLayout() {
   const router = useRouter();
   return (
     <RootDocument>
-      <ClerkProvider
+      <ClerkErrorBoundary>
+        <ClerkProvider
         publishableKey={env.clerkPublishableKey}
         signInFallbackRedirectUrl="/dashboard"
         signUpFallbackRedirectUrl="/dashboard"
@@ -180,8 +181,24 @@ function RootLayout() {
           </ClerkLoaded>
         </QueryClientProvider>
       </ClerkProvider>
+      </ClerkErrorBoundary>
     </RootDocument>
   );
+}
+
+/** A bad Clerk key must show an error, never a white screen. */
+class ClerkErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { error: unknown }
+> {
+  state = { error: null as unknown };
+  static getDerivedStateFromError(error: unknown) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) return <EnvError error={this.state.error} reset={() => {}} />;
+    return this.props.children;
+  }
 }
 
 function FullPageLoading() {

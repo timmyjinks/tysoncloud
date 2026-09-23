@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "start": "node server.mjs",
+    "start": "node .output/server/index.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
+    "nitro": "npm:nitro-nightly@3.0.1-20260923-001540-22b17bb3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^2.6.0"
@@ -27,11 +28,11 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.4.20",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^8.3.0"
   },
   "packageManager": "pnpm@10.33.0"
 }

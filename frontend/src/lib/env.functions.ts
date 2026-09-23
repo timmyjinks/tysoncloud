@@ -19,12 +19,20 @@ export interface PublicRuntimeEnv {
  */
 export const getRuntimeEnv = createServerFn({ method: "GET" }).handler(
   async (): Promise<PublicRuntimeEnv> => {
-    return {
-      clerkPublishableKey:
-        process.env.VITE_CLERK_PUBLISHABLE_KEY ??
-        process.env.CLERK_PUBLISHABLE_KEY ??
-        "",
-      apiUrl: process.env.VITE_API_URL ?? process.env.API_URL ?? "",
-    };
+    const clerkPublishableKey = (
+      process.env.VITE_CLERK_PUBLISHABLE_KEY ??
+      process.env.CLERK_PUBLISHABLE_KEY ??
+      ""
+    ).trim();
+    const apiUrl = (
+      process.env.VITE_API_URL ??
+      process.env.API_URL ??
+      ""
+    ).trim();
+    // Logs key presence (never values): proves pod env reaches the server.
+    console.log(
+      `[env] runtime keys present: clerk=${clerkPublishableKey ? `yes(len=${clerkPublishableKey.length})` : "NO"}, apiUrl=${apiUrl ? `yes(${apiUrl})` : "NO"}`,
+    );
+    return { clerkPublishableKey, apiUrl };
   },
 );

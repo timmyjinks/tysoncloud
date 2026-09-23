@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TYSONCLOUD</title>
+  <meta name="description"
+    content="TYSONCLOUD is a deploy platform. Push a Docker image, get a running service, a public domain with TLS, and managed Postgres — without managing servers." />
+  <link rel="canonical" href="https://tysoncloud.dev/" />
+  <meta name="robots" content="index, follow" />
+  <meta name="theme-color" content="#100e0b" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TYSONCLOUD" />
+  <meta property="og:title" content="TYSONCLOUD — Deploy services, databases, and volumes in one shot" />
+  <meta property="og:description"
+    content="TYSONCLOUD is a deploy platform. Push a Docker image, get a running service, a public domain with TLS, and managed Postgres — without managing servers." />
+  <meta property="og:url" content="https://tysoncloud.dev/" />
+  <meta property="og:locale" content="en_US" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TYSONCLOUD — Deploy services, databases, and volumes in one shot" />
+  <meta name="twitter:description"
+    content="TYSONCLOUD is a deploy platform. Push a Docker image, get a running service, a public domain with TLS, and managed Postgres — without managing servers." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "name": "TYSONCLOUD",
+        "url": "https://tysoncloud.dev/"
+      },
+      {
+        "@type": "WebSite",
+        "name": "TYSONCLOUD",
+        "url": "https://tysoncloud.dev/"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "name": "TYSONCLOUD",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Web",
+        "url": "https://tysoncloud.dev/",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is TYSONCLOUD?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "TYSONCLOUD is a deploy platform. Push a Docker image and get a running service, a public domain with automatic TLS, and a managed Postgres database if you need one — no servers to babysit."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I deploy a service?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Create a project, add a service with a Docker image and a port, optionally set environment variables, and TYSONCLOUD builds, runs, and exposes it on a tysoncloud.dev domain."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What databases are supported?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Managed Postgres today. Each database gets an internal hostname and storage you can scale from the dashboard."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Can I attach persistent storage?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. Attach a volume to any service with a mount path and storage size, and it survives redeploys."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I define infrastructure without clicking forms?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Use config as code: declare services, databases, and volumes in TOML and apply them to a project in one shot."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <script src="/env.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <noscript>
+    <p style="
+        margin: 0;
+        padding: 2rem;
+        background: #100e0b;
+        color: #b5ac9d;
+        font-family: ui-monospace, monospace;
+        font-size: 14px;
+        text-align: center;
+      ">
+      TYSONCLOUD requires JavaScript to deploy services and databases.
+    </p>
+  </noscript>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>

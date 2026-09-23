@@ -1,6 +1,5 @@
 node_modules
 dist
-.output
 .env.local
 src/routeTree.gen.ts
 *.log

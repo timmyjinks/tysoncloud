@@ -8,7 +8,7 @@ export const Route = createFileRoute("/sign-in")({
     redirect: typeof search.redirect === "string" ? search.redirect : undefined,
   }),
   beforeLoad: ({ context, search }) => {
-    if (context.auth?.isSignedIn) {
+    if (context.auth.isSignedIn) {
       throw redirect({ to: safeRedirectTarget(search.redirect) });
     }
   },

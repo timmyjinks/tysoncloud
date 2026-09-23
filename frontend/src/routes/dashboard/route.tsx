@@ -3,7 +3,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 
 export const Route = createFileRoute("/dashboard")({
   beforeLoad: ({ context, location }) => {
-    if (context.auth && !context.auth.isSignedIn) {
+    if (!context.auth.isSignedIn) {
       throw redirect({ to: "/sign-in", search: { redirect: location.href } });
     }
   },

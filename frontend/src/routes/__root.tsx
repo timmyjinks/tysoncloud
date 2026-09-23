@@ -16,6 +16,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import { authRef, type AuthState } from "@/lib/auth-ref";
 import { useRuntimeEnv } from "@/lib/env";
+import "../app.css";
 
 type RouterContext = {
   auth: AuthState | null;

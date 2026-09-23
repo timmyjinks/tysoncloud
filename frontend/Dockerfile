@@ -13,7 +13,13 @@ RUN pnpm exec vite build
 
 FROM node:22-slim AS runner
 WORKDIR /app
-RUN npm install -g serve
+RUN corepack enable
+ENV NODE_ENV=production \
+    PORT=3000
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+RUN pnpm prune --prod
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/server.mjs ./server.mjs
 EXPOSE 3000
-CMD ["/bin/sh", "-c", "printf 'window.__ENV__ = {\\n  VITE_CLERK_PUBLISHABLE_KEY: \"%s\",\\n  VITE_API_URL: \"%s\"\\n};\\n' \"$VITE_CLERK_PUBLISHABLE_KEY\" \"$VITE_API_URL\" > /app/dist/env.js && serve -s dist -l 3000"]
+CMD ["node", "server.mjs"]

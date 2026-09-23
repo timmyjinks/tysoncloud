@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview",
+    "start": "node server.mjs",
     "lint": "eslint ."
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.19.0",
     "@tanstack/react-query": "^5.62.0",
-    "@tanstack/react-router": "^1.95.0",
+    "@tanstack/react-router": "^1.170.38",
+    "@tanstack/react-start": "^1.168.57",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.469.0",
@@ -22,7 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
-    "@tanstack/router-plugin": "^1.95.0",
+    "@tanstack/router-plugin": "^1.168.40",
     "@types/node": "^26.1.1",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",

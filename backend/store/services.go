@@ -18,7 +18,13 @@ type ServicesTable struct {
 	PrivateDomain string    `json:"private_domain"`
 	Port          int32     `json:"port"`
 	Image         string    `json:"image"`
+	Production    *bool     `json:"production,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
+}
+
+// IsProductionRow reports whether a service row should be treated as prod.
+func IsProductionRow(p *bool) bool {
+	return p == nil || *p
 }
 
 type PostgrestError struct {
@@ -34,6 +40,24 @@ func (s *SupabaseStore) GetService(id, userId string) (ServicesTable, error) {
 		Eq("id", id).
 		Eq("projects.user_id", userId).
 		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Single().
+		Execute()
+	if err != nil {
+		return ServicesTable{}, err
+	}
+
+	var table ServicesTable
+	if err := json.Unmarshal(res, &table); err != nil {
+		return ServicesTable{}, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetServiceById(id string) (ServicesTable, error) {
+	res, _, err := s.cli.From("services").
+		Select("*", "exact", false).
+		Eq("id", id).
 		Single().
 		Execute()
 	if err != nil {
@@ -65,6 +89,38 @@ func (s *SupabaseStore) GetServices(projectId, userId string) ([]ServicesTable, 
 	}
 
 	return table, nil
+}
+
+func (s *SupabaseStore) GetServicesByProjectId(projectId string) ([]ServicesTable, error) {
+	res, _, err := s.cli.From("services").
+		Select("*", "exact", false).
+		Eq("project_id", projectId).
+		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	var table []ServicesTable = []ServicesTable{}
+	if err := json.Unmarshal(res, &table); err != nil {
+		return nil, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetProductionServicesByProjectId(projectId string) ([]ServicesTable, error) {
+	all, err := s.GetServicesByProjectId(projectId)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]ServicesTable, 0, len(all))
+	for _, svc := range all {
+		if IsProductionRow(svc.Production) {
+			out = append(out, svc)
+		}
+	}
+	return out, nil
 }
 
 func (s *SupabaseStore) CreateService(userId, projectId, name, image string, domain *string, port int32) (ServicesTable, error) {

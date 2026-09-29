@@ -157,6 +157,9 @@ func (app *Application) GetGithubServices(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's services.", err)
 		return
 	}
+	if copies, cerr := app.Supabase.GetPreviewCopyIDs(projectId); cerr == nil {
+		services = filterPreviewCopies(services, func(s store.GithubServicesTable) string { return s.Id }, copies)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(ToGithubServicesResponse(services)); err != nil {
@@ -705,11 +708,6 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Snapshot previews BEFORE the DB delete: the namespace is shared per
-	// repo+PR, so remove only this service's K8s objects from it and delete
-	// the namespace only when no sibling previews remain. No env values are
-	// stored in preview_environments, so nothing secret to purge.
-	previewsBefore, _ := app.Supabase.GetPreviewEnvironmentsByService(githubServiceId)
 	svcBefore, _ := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
 
 	if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
@@ -717,8 +715,9 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	cleanupSharedPreviewObjects(r.Context(), app, previewsBefore)
-	_ = app.Supabase.DeletePreviewEnvironmentsByService(githubServiceId)
+	if svcBefore.Name != "" {
+		app.deletePreviewCopiesOfService(r.Context(), claims.Subject, projectId, svcBefore.Name)
+	}
 
 	resourceName := "svc-" + githubServiceId
 	if svcBefore.ResourceName != "" {
@@ -734,50 +733,52 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(204)
 }
 
-// cleanupSharedPreviewObjects removes one service's preview K8s objects from
-// the shared per-repo+PR namespace and deletes the namespace itself only
-// when no remaining previews reference it. Best-effort — a missing object
-// just means that preview never deployed. Deploy.DeleteService is idempotent
-// (ignores NotFound for Secret/PVC/HPA/Deployment/Service/HTTPRoute).
-func cleanupSharedPreviewObjects(ctx context.Context, app *Application, previews []store.PreviewEnvironmentsTable) {
-	for _, p := range previews {
-		if strings.TrimSpace(p.Namespace) == "" || strings.TrimSpace(p.ResourceName) == "" {
-			continue
-		}
-		if err := app.Deploy.DeleteService(ctx, deploy.Service{
-			Namespace: p.Namespace,
-			Name:      p.ResourceName,
-		}); err != nil {
-			slog.Warn("failed to clean up preview objects", "service_id", p.GithubServiceId, "namespace", p.Namespace, "name", p.ResourceName, "err", err)
-		}
+func (app *Application) deletePreviewCopiesOfService(ctx context.Context, userId, projectId, baseName string) {
+	envs, _, err := app.Supabase.GetPreviewEnvironmentsForProject(projectId)
+	if err != nil {
+		slog.Warn("failed to list preview envs for copy cleanup", "project_id", projectId, "err", err)
+		return
 	}
-	seen := map[string]store.PreviewEnvironmentsTable{}
-	for _, p := range previews {
-		if strings.TrimSpace(p.Namespace) == "" {
-			continue
-		}
-		seen[p.Namespace] = p
-	}
-	for namespace, sample := range seen {
-		remaining, err := app.Supabase.GetPreviewEnvironmentsByRepoPR(sample.RepoId, sample.PrNumber)
+	affected := map[string]store.PreviewEnvironment{}
+	for _, env := range envs {
+		children, err := app.Supabase.GetPreviewEnvironmentServices(env.Id)
 		if err != nil {
-			slog.Warn("failed to check remaining previews, keeping namespace", "namespace", namespace, "err", err)
 			continue
 		}
-		stillReferenced := false
-		for _, r := range remaining {
-			if strings.TrimSpace(r.Namespace) == namespace {
-				stillReferenced = true
-				break
+		want := store.PreviewCopyName(baseName, env.Pr)
+		for _, c := range children {
+			src, err := app.Supabase.GetPreviewSource(c.SourceType, c.SourceServiceId)
+			if err != nil || src.Name != want {
+				continue
 			}
+			previewName := util.PreviewResourceName(src.ResourceName, env.Pr)
+			if c.SourceType == "database" {
+				if err := app.Deploy.DeleteDatabase(ctx, deploy.Database{Namespace: env.Namespace, Name: previewName, Engine: src.Engine}); err != nil {
+					slog.Warn("failed to clean up preview copy database", "source", c.SourceServiceId, "namespace", env.Namespace, "err", err)
+				}
+			} else if err := app.Deploy.DeleteService(ctx, deploy.Service{Namespace: env.Namespace, Name: previewName}); err != nil {
+				slog.Warn("failed to clean up preview copy objects", "source", c.SourceServiceId, "namespace", env.Namespace, "name", previewName, "err", err)
+			}
+			_ = app.Supabase.DeletePreviewEnvironmentServicesBySource(c.SourceServiceId)
+			if err := app.Supabase.DeletePreviewCopy(userId, c.SourceType, c.SourceServiceId); err != nil {
+				slog.Warn("failed to delete preview copy row", "source", c.SourceServiceId, "err", err)
+				continue
+			}
+			affected[env.Id] = env
 		}
-		if stillReferenced {
+	}
+	for envID, env := range affected {
+		children, err := app.Supabase.GetPreviewEnvironmentServices(envID)
+		if err != nil || len(children) != 0 {
 			continue
 		}
-		if err := app.Deploy.DeleteProject(ctx, namespace); err != nil {
-			slog.Warn("failed to clean up empty preview namespace", "namespace", namespace, "err", err)
+		if err := app.Deploy.DeleteProject(ctx, env.Namespace); err != nil {
+			slog.Warn("failed to clean up empty preview namespace", "namespace", env.Namespace, "err", err)
 		} else {
-			slog.Info("preview cleanup: deleted empty namespace", "namespace", namespace)
+			slog.Info("preview cleanup: deleted empty namespace", "namespace", env.Namespace)
+		}
+		if err := app.Supabase.DeletePreviewEnvironment(envID); err != nil {
+			slog.Warn("failed to clean up empty preview env", "env_id", envID, "err", err)
 		}
 	}
 }
@@ -809,16 +810,14 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, id := range req.Ids {
-		previewsBefore, _ := app.Supabase.GetPreviewEnvironmentsByService(id)
 		svcBefore, _ := app.Supabase.GetGithubService(id, claims.Subject)
 		if err := app.Supabase.DeleteGithubService(id, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: id, Error: "Couldn't delete the service."})
 			continue
 		}
-		// Cascade preview objects for this service only (best-effort);
-		// the shared namespace goes away only when its last preview does.
-		cleanupSharedPreviewObjects(r.Context(), app, previewsBefore)
-		_ = app.Supabase.DeletePreviewEnvironmentsByService(id)
+		if svcBefore.Name != "" {
+			app.deletePreviewCopiesOfService(r.Context(), claims.Subject, projectId, svcBefore.Name)
+		}
 		resourceName := "svc-" + id
 		if svcBefore.ResourceName != "" {
 			resourceName = svcBefore.ResourceName

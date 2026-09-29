@@ -135,6 +135,52 @@ type GithubServiceDeleteRequest struct {
 	Id string `json:"id"`
 }
 
+type PreviewEnvironmentResponse struct {
+	Id              string            `json:"id"`
+	PreviewEnvId    string            `json:"preview_env_id"`
+	EnvName         string            `json:"env_name"`
+	SourceType      string            `json:"source_type"`
+	SourceServiceId string            `json:"source_service_id"`
+	GithubServiceId string            `json:"github_service_id"`
+	ServiceName     string            `json:"service_name"`
+	RepoName        string            `json:"repo_name"`
+	Engine          string            `json:"engine,omitempty"`
+	Pr              int               `json:"pr"`
+	PrURL           string            `json:"pr_url"`
+	Branch          string            `json:"branch"`
+	Hostname        string            `json:"hostname"`
+	URL             string            `json:"url"`
+	Env             map[string]string `json:"env"`
+	PreviewURL      string            `json:"preview_url"`
+	Port            int32             `json:"port"`
+	Status          string            `json:"status,omitempty"`
+	CreatedAt       time.Time         `json:"created_at"`
+}
+
+type PreviewEnvSummary struct {
+	Id        string    `json:"id"`
+	ProjectId string    `json:"project_id"`
+	Name      string    `json:"name"`
+	Pr        int       `json:"pr"`
+	Namespace string    `json:"namespace"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PreviewEnvListItem struct {
+	Id        string                       `json:"id"`
+	ProjectId string                       `json:"project_id"`
+	Name      string                       `json:"name"`
+	Pr        int                          `json:"pr"`
+	Namespace string                       `json:"namespace"`
+	Services  []PreviewEnvironmentResponse `json:"services"`
+	CreatedAt time.Time                    `json:"created_at"`
+}
+
+type PreviewServiceUpdateRequest struct {
+	Env  *string `json:"env,omitempty"`
+	Port *int32  `json:"port,omitempty"`
+}
+
 type ProjectResponse struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`

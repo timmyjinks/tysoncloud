@@ -196,3 +196,15 @@ func (d *KubernetesService) GetDeploymentDiagnosticLogs(ctx context.Context, res
 func (d *KubernetesService) DeleteDeployment(ctx context.Context, resource Resource) error {
 	return d.clientset.AppsV1().Deployments(resource.Namespace).Delete(ctx, resource.Name, metav1.DeleteOptions{})
 }
+
+func (d *KubernetesService) GetDeploymentImage(ctx context.Context, resource Resource) (string, error) {
+	dep, err := d.clientset.AppsV1().Deployments(resource.Namespace).Get(ctx, resource.Name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	containers := dep.Spec.Template.Spec.Containers
+	if len(containers) == 0 || containers[0].Image == "" {
+		return "", fmt.Errorf("deployment %s/%s has no container image", resource.Namespace, resource.Name)
+	}
+	return containers[0].Image, nil
+}

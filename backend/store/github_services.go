@@ -22,6 +22,7 @@ type GithubServicesTable struct {
 	Port               int32     `json:"port"`
 	RootDir            string    `json:"root_dir"`
 	Branch             string    `json:"branch"`
+	Production         *bool     `json:"production,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -118,6 +119,23 @@ func (s *SupabaseStore) GetGithubServicesByRepoId(repoId int64) ([]GithubService
 	res, _, err := s.cli.From("github_services").
 		Select("*", "exact", false).
 		Eq("repo_id", strconv.FormatInt(repoId, 10)).
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	var table []GithubServicesTable = []GithubServicesTable{}
+	if err := json.Unmarshal(res, &table); err != nil {
+		return nil, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetGithubServicesByProjectId(projectId string) ([]GithubServicesTable, error) {
+	res, _, err := s.cli.From("github_services").
+		Select("*", "exact", false).
+		Eq("project_id", projectId).
 		Execute()
 	if err != nil {
 		return nil, err

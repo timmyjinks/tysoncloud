@@ -74,6 +74,9 @@ func (app *Application) GetDatabases(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's databases.", err)
 		return
 	}
+	if copies, cerr := app.Supabase.GetPreviewCopyIDs(projectId); cerr == nil {
+		databases = filterPreviewCopies(databases, func(d store.DatabasesTable) string { return d.Id }, copies)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(ToDatabasesResponse(databases)); err != nil {

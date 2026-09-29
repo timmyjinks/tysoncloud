@@ -81,6 +81,9 @@ func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's services.", err)
 		return
 	}
+	if copies, cerr := app.Supabase.GetPreviewCopyIDs(projectId); cerr == nil {
+		services = filterPreviewCopies(services, func(s store.ServicesTable) string { return s.Id }, copies)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(ToServicesResponse(services)); err != nil {

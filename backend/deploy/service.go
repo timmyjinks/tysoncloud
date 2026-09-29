@@ -48,6 +48,21 @@ func (d *DeployService) GetServiceEnv(ctx context.Context, service Service) (map
 	return d.svc.GetSecret(ctx, ServiceToResource(service))
 }
 
+func (d *DeployService) UpsertSecret(ctx context.Context, namespace, name string, env map[string][]byte) error {
+	return d.svc.CreateSecret(ctx, ServiceToResource(Service{
+		Namespace: namespace,
+		Name:      name,
+		Env:       env,
+	}))
+}
+
+func (d *DeployService) GetServiceImage(ctx context.Context, namespace, name string) (string, error) {
+	return d.svc.GetDeploymentImage(ctx, ServiceToResource(Service{
+		Namespace: namespace,
+		Name:      name,
+	}))
+}
+
 func (d *DeployService) DeleteService(ctx context.Context, service Service) error {
 	if err := d.svc.DeleteSecret(ctx, ServiceToResource(service)); err != nil && !apierrors.IsNotFound(err) {
 		return err

@@ -175,13 +175,8 @@ func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, root
 	return s.CloneAndBuildWithLogs(ctx, cloneURL, accessToken, rootDir, branch, imageTag, nil, nil)
 }
 
-// envKeyRegex gates which keys are forwarded to `railpack prepare --env`.
-// Anything outside [A-Za-z_][A-Za-z0-9_]* is skipped (never logged either).
 var envKeyRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// railpackEnvArgs converts an env map into sorted `--env KEY=VALUE` arg pairs
-// for `railpack prepare`. Sorted for reproducible plans/logs. Keys only ever
-// appear in logs via the caller's env_keys line — never values.
 func railpackEnvArgs(env map[string][]byte) []string {
 	if len(env) == 0 {
 		return nil
@@ -200,7 +195,6 @@ func railpackEnvArgs(env map[string][]byte) []string {
 	return args
 }
 
-// railpackEnvKeys returns the sorted, valid key names (for keys-only logging).
 func railpackEnvKeys(env map[string][]byte) []string {
 	if len(env) == 0 {
 		return nil
@@ -215,10 +209,6 @@ func railpackEnvKeys(env map[string][]byte) []string {
 	return keys
 }
 
-// buildctlSecretArgs converts an env map into `--secret id=KEY,env=KEY` arg
-// pairs for `buildctl build` (railpack-frontend flow). Same sorted valid keys
-// as railpackEnvArgs. The values are read from buildctl's own process env
-// (env=KEY), so callers must export them on the command's Env.
 func buildctlSecretArgs(env map[string][]byte) []string {
 	keys := railpackEnvKeys(env)
 	if len(keys) == 0 {
@@ -231,9 +221,6 @@ func buildctlSecretArgs(env map[string][]byte) []string {
 	return args
 }
 
-// secretsHash mirrors upstream getSecretsHash: hex sha256 over sorted
-// "KEY=VALUE\n" lines. Passed as build-arg:secrets-hash so changed secret
-// values bust the layer cache (the frontend does NOT do this automatically).
 func secretsHash(env map[string][]byte) string {
 	keys := railpackEnvKeys(env)
 	if len(keys) == 0 {
@@ -246,8 +233,6 @@ func secretsHash(env map[string][]byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// exportEnv returns base with every valid key of env appended as KEY=VALUE,
-// replacing any existing entries for those keys (append wins in exec env).
 func exportEnv(base []string, env map[string][]byte) []string {
 	keys := railpackEnvKeys(env)
 	if len(keys) == 0 {
@@ -334,12 +319,6 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 		}
 	}
 
-	// NOTE: cloneURL must be the PR *head* repo URL, not the base repo URL.
-	// For same-repo PRs they are identical; for fork PRs the head URL points
-	// at the fork. This is what makes fork previews work without extra code.
-	// QUESTION: private forks may 404 with the installation token (the token
-	// belongs to the base repo installation). If that becomes a problem we
-	// should skip forks or fall back to checking out the merge ref instead.
 	emit(fmt.Sprintf("[state] building: cloning PR head %s ref=%s sha=%s root_dir=%s", cloneURL, headRef, headSHA, rootDir))
 	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, headRef, logFn)
 	if err != nil {
@@ -349,14 +328,10 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 	defer os.RemoveAll(cloneDir)
 	emit("[state] building: cloning succeeded")
 
-	// Pin to the exact PR head SHA so a `synchronize` race (new push between
-	// webhook delivery and clone) still builds what GitHub reported.
 	if strings.TrimSpace(headSHA) != "" {
 		fetch := exec.CommandContext(ctx, "git", "-C", cloneDir, "fetch", "origin", strings.TrimSpace(headSHA), "--depth", "1")
 		fetch.Env = os.Environ()
 		if out, ferr := runCmdWithLogs(fetch, logFn); ferr != nil {
-			// Shallow single-branch clones often already contain the tip;
-			// a failed fetch is non-fatal — try a direct checkout next.
 			slog.Warn("git fetch sha failed, trying checkout", "sha", headSHA, "err", ferr, "output", out)
 		}
 		checkedOut := false
@@ -372,8 +347,6 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 			}
 		}
 		if !checkedOut {
-			// Neither checkout worked — fall back to whatever the clone
-			// gave us (the branch tip) rather than failing the preview.
 			slog.Warn("git checkout sha failed, using branch tip", "sha", headSHA)
 		}
 	}
@@ -393,10 +366,6 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 	return image, nil
 }
 
-// PostPRComment posts a comment on the PR via the issues API, which shares
-// numbering with pull requests. Returns the created comment id so callers can
-// PATCH it later for live updates. Best-effort: callers should log but not
-// fail the deploy on comment errors.
 func (s *Service) PostPRComment(ctx context.Context, installationToken, repoFullName string, prNumber int, body string) (int64, error) {
 	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || prNumber <= 0 {
 		return 0, fmt.Errorf("installation token, repo and PR number are required")
@@ -427,9 +396,6 @@ func (s *Service) PostPRComment(ctx context.Context, installationToken, repoFull
 	return out.Id, nil
 }
 
-// UpdatePRComment edits an existing issue/PR comment in place. Used for the
-// single live preview comment per PR. A 404 means the comment was deleted —
-// callers should recreate via PostPRComment.
 func (s *Service) UpdatePRComment(ctx context.Context, installationToken, repoFullName string, commentID int64, body string) error {
 	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || commentID <= 0 {
 		return fmt.Errorf("installation token, repo and comment id are required")
@@ -456,9 +422,6 @@ func (s *Service) UpdatePRComment(ctx context.Context, installationToken, repoFu
 	return nil
 }
 
-// FindPRCommentByMarker lists PR comments and returns the id of the first one
-// containing marker (our hidden HTML marker). 0 = not found. Used to adopt an
-// existing live comment when the DB row is missing.
 func (s *Service) FindPRCommentByMarker(ctx context.Context, installationToken, repoFullName string, prNumber int, marker string) int64 {
 	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || prNumber <= 0 || marker == "" {
 		return 0
@@ -565,8 +528,6 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 	defer os.RemoveAll(planDir)
 	planPath := filepath.Join(planDir, "railpack-plan.json")
 
-	// Bake app envs into the image plan (e.g. Vite API_URL). Keys only in
-	// logs — never values.
 	envArgs := railpackEnvArgs(env)
 	if keys := railpackEnvKeys(env); len(keys) > 0 {
 		msg := fmt.Sprintf("[state] building: railpack env_keys=%d [%s]", len(keys), strings.Join(keys, ","))
@@ -590,9 +551,6 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		"--frontend=gateway.v0",
 		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest",
 	}
-	// Secrets reach the frontend via BuildKit session secrets: values come
-	// from buildctl's process env (env=KEY), ids only in argv. Keys-only in
-	// logs — never values.
 	if secretArgs := buildctlSecretArgs(env); len(secretArgs) > 0 {
 		buildArgs = append(buildArgs, secretArgs...)
 	}

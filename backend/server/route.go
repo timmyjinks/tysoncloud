@@ -34,6 +34,9 @@ func (s *Application) registerRoutes(
 	r.Handle("/projects/{project_id}/github_services", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.CreateGithubService))).Methods("POST")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdateGithubService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}/redeploy", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.RedeployGithubService))).Methods("POST")
+	r.Handle("/projects/{project_id}/preview_environments", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetProjectPreviewEnvironments))).Methods("GET")
+	r.Handle("/projects/{project_id}/preview_environments/{preview_environment_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.GetProjectPreviewEnvironment))).Methods("GET")
+	r.Handle("/projects/{project_id}/preview_environments/{preview_environment_id}/services/{source_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.UpdatePreviewEnvironmentService))).Methods("PUT")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}", clerkhttp.RequireHeaderAuthorization()(http.HandlerFunc(s.DeleteGithubService))).Methods("DELETE")
 	r.HandleFunc("/projects/{project_id}/github_services/{github_service_id}/logs", s.GetGithubServiceLogs).Methods("GET")
 

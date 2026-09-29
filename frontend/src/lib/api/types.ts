@@ -152,3 +152,49 @@ export type GithubReposResponse = {
   total_count: number;
   repositories: GithubRepo[];
 };
+
+export type PreviewEnvironment = {
+  id: string;
+  preview_env_id: string;
+  env_name: string;
+  source_type: string;
+  source_service_id: string;
+  github_service_id: string;
+  service_name: string;
+  repo_name: string;
+  engine: string;
+  pr: number;
+  pr_url: string;
+  branch: string;
+  hostname: string;
+  url: string;
+  env: Record<string, string>;
+  preview_url: string;
+  port: number;
+  status: string;
+  created_at: string;
+};
+
+export type PreviewEnvSummary = {
+  id: string;
+  project_id: string;
+  name: string;
+  pr: number;
+  namespace: string;
+  created_at: string;
+};
+
+export type PreviewServiceUpdateRequest = {
+  env?: string;
+  port?: number;
+};
+
+export type PreviewEnvListItem = {
+  id: string;
+  project_id: string;
+  name: string;
+  pr: number;
+  namespace: string;
+  services: PreviewEnvironment[];
+  created_at: string;
+};

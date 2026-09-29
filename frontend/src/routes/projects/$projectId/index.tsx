@@ -360,7 +360,7 @@ function ProjectDetail() {
                   icon={<Github className="h-5 w-5" />}
                   name={resource.data.name}
                   status={resource.data.status}
-                  runtime={resource.data.repo}
+                  runtime={resource.data.repo_name}
                   subtitle={`root:${resource.data.root_dir} · ${SERVICE_RESOURCE_LIMITS.cpu} · ${SERVICE_RESOURCE_LIMITS.memory}`}
                   size={`:${resource.data.port}`}
                   domain={resource.data.public_domain}

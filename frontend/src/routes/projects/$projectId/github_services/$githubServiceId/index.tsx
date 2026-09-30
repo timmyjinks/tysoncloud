@@ -11,6 +11,7 @@ import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { ErrorBanner } from "@/components/error-banner";
 import { GithubServiceLogsDrawer } from "@/components/github-service-logs-drawer";
+import { PreviewServiceEditDialog } from "@/components/preview-service-edit-dialog";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 
 export const Route = createFileRoute("/projects/$projectId/github_services/$githubServiceId/")({
@@ -25,6 +26,7 @@ function GithubServiceDetail() {
   const redeployGithubService = useRedeployGithubService(projectId, githubServiceId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [editingPreview, setEditingPreview] = useState(false);
   const isDeploying =
     service?.status === "building" || service?.status === "deploying" || redeployGithubService.isPending;
 
@@ -54,6 +56,28 @@ function GithubServiceDetail() {
         ← Back to project
       </Link>
 
+      {service.preview && (
+        <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--color-surface-2)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
+          <span>
+            Ephemeral preview {service.preview.name} — managed by the pull request. Edits
+            apply here only and reset on the next sync.
+          </span>
+          {service.preview.pr_url && (
+            <a
+              href={service.preview.pr_url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+            >
+              #{service.preview.pr} ↗
+            </a>
+          )}
+          <span className="font-mono text-[var(--color-text-faint)]">
+            {service.preview.namespace}
+          </span>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-4">
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">{service.name}</h1>
         <DropdownMenu
@@ -72,23 +96,27 @@ function GithubServiceDetail() {
             <Terminal className="h-4 w-4" />
             View logs
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => {
-              if (isDeploying) return;
-              redeployGithubService.mutate(undefined, {
-                onSuccess: () => setLogsOpen(true),
-              });
-            }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            {isDeploying ? "Redeploying…" : "Redeploy"}
-          </DropdownMenuItem>
+          {!service.preview && (
+            <DropdownMenuItem
+              onClick={() => {
+                if (isDeploying) return;
+                redeployGithubService.mutate(undefined, {
+                  onSuccess: () => setLogsOpen(true),
+                });
+              }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              {isDeploying ? "Redeploying…" : "Redeploy"}
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={() =>
-              navigate({
-                to: "/projects/$projectId/github_services/$githubServiceId/edit",
-                params: { projectId, githubServiceId },
-              })
+              service.preview
+                ? setEditingPreview(true)
+                : navigate({
+                    to: "/projects/$projectId/github_services/$githubServiceId/edit",
+                    params: { projectId, githubServiceId },
+                  })
             }
           >
             <Pencil className="h-4 w-4" />
@@ -169,7 +197,7 @@ function GithubServiceDetail() {
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
         resourceName={service.name}
-        resourceLabel="service"
+        resourceLabel={service.preview ? "preview service" : "service"}
         pending={deleteGithubService.isPending}
         error={deleteGithubService.error ? getErrorMessage(deleteGithubService.error) : undefined}
         onConfirm={() =>
@@ -186,6 +214,25 @@ function GithubServiceDetail() {
         githubServiceId={service.id}
         serviceName={service.name}
       />
+
+      {service.preview && (
+        <PreviewServiceEditDialog
+          projectId={projectId}
+          envId={service.preview.env_id}
+          service={
+            editingPreview
+              ? {
+                  sourceId: service.id,
+                  serviceName: service.name,
+                  env: service.env ?? {},
+                  port: service.port,
+                }
+              : null
+          }
+          onClose={() => setEditingPreview(false)}
+          onSaved={() => refetch()}
+        />
+      )}
     </main>
   );
 }

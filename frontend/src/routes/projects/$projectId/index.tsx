@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronDown,
@@ -21,10 +21,8 @@ import {
 import {
   useProjectPreviewEnvironment,
   useProjectPreviewEnvironments,
-  useUpdatePreviewService,
 } from "@/lib/api/previews";
 import { ApiRequestError, getErrorMessage } from "@/lib/api/client";
-import { formatEnvLines } from "@/lib/utils";
 import { ResourceRow } from "@/components/resource-row";
 import { ResourceStatusBar } from "@/components/resource-status-bar";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
@@ -35,12 +33,13 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  PreviewServiceEditDialog,
+  type PreviewEditTarget,
+} from "@/components/preview-service-edit-dialog";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 import { Checkbox } from "@/components/ui/checkbox";
-import type { PreviewEnvironment, Service, Database, GithubService } from "@/lib/api/types";
+import type { Service, Database, GithubService } from "@/lib/api/types";
 
 export const Route = createFileRoute("/projects/$projectId/")({
   component: ProjectDetail,
@@ -89,7 +88,12 @@ function ProjectDetail() {
   // Environment scope: production is the live resource list below; any other
   // value is a preview env id whose service copies replace it.
   const [selectedEnv, setSelectedEnv] = useState("production");
-  const [editingPreview, setEditingPreview] = useState<PreviewEnvironment | null>(null);
+  const [editingPreview, setEditingPreview] = useState<PreviewEditTarget>(null);
+  const [pendingPreview, setPendingPreview] = useState<{
+    id: string;
+    name: string;
+    kind: "service" | "database" | "github_service";
+  } | null>(null);
   const {
     data: previewEnvs,
     error: previewEnvsError,
@@ -537,13 +541,22 @@ function ProjectDetail() {
             <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
               {selectedPreviewEnv.services.map((s) => {
                 const isDb = s.source_type === "database";
+                const isSvc = s.source_type === "service";
                 const icon = isDb ? (
                   <DatabaseIcon className="h-5 w-5" />
-                ) : s.source_type === "service" ? (
+                ) : isSvc ? (
                   <Server className="h-5 w-5" />
                 ) : (
                   <Github className="h-5 w-5" />
                 );
+                // Same detail/delete pages as prod — a preview copy is a real
+                // service row, the backend resolves it to the preview
+                // namespace. Update stays port + env only via the dialog.
+                const detailHref = isDb
+                  ? `/projects/${projectId}/databases/${s.source_service_id}`
+                  : isSvc
+                    ? `/projects/${projectId}/services/${s.source_service_id}`
+                    : `/projects/${projectId}/github_services/${s.source_service_id}`;
                 return (
                   <ResourceRow
                     key={`preview-${s.preview_env_id}-${s.source_service_id}`}
@@ -553,21 +566,39 @@ function ProjectDetail() {
                     runtime={
                       isDb
                         ? s.engine || "database"
-                        : s.source_type === "service"
+                        : isSvc
                           ? "service"
                           : s.repo_name
                     }
                     subtitle={
                       isDb
                         ? "empty copy — no production data"
-                        : s.source_type === "service"
+                        : isSvc
                           ? undefined
                           : `${s.branch} · ${s.repo_name}`
                     }
                     size={s.port ? `:${s.port}` : ""}
                     domain={isDb ? "internal" : s.hostname}
                     domainHref={!isDb && s.url ? s.url : undefined}
-                    onUpdate={isDb ? undefined : () => setEditingPreview(s)}
+                    detailHref={detailHref}
+                    onUpdate={
+                      isDb
+                        ? undefined
+                        : () =>
+                            setEditingPreview({
+                              sourceId: s.source_service_id,
+                              serviceName: s.service_name,
+                              env: s.env ?? {},
+                              port: s.port,
+                            })
+                    }
+                    onDelete={() =>
+                      setPendingPreview({
+                        id: s.source_service_id,
+                        name: s.service_name,
+                        kind: isDb ? "database" : isSvc ? "service" : "github_service",
+                      })
+                    }
                   />
                 );
               })}
@@ -621,6 +652,44 @@ function ProjectDetail() {
         }}
       />
 
+      <DeleteConfirmDialog
+        open={!!pendingPreview}
+        onOpenChange={(open) => !open && setPendingPreview(null)}
+        resourceName={pendingPreview?.name ?? ""}
+        resourceLabel={
+          pendingPreview?.kind === "database" ? "database" : "preview service"
+        }
+        pending={
+          deleteService.isPending ||
+          deleteDatabase.isPending ||
+          deleteGithubService.isPending
+        }
+        error={
+          pendingPreview?.kind === "service" && deleteService.error
+            ? getErrorMessage(deleteService.error)
+            : pendingPreview?.kind === "database" && deleteDatabase.error
+              ? getErrorMessage(deleteDatabase.error)
+              : pendingPreview?.kind === "github_service" && deleteGithubService.error
+                ? getErrorMessage(deleteGithubService.error)
+                : undefined
+        }
+        onConfirm={() => {
+          if (!pendingPreview) return;
+          const done = () => {
+            setPendingPreview(null);
+            previewDetail.refetch();
+            refetchPreviewEnvs();
+          };
+          if (pendingPreview.kind === "service") {
+            deleteService.mutate(pendingPreview.id, { onSuccess: done });
+          } else if (pendingPreview.kind === "database") {
+            deleteDatabase.mutate(pendingPreview.id, { onSuccess: done });
+          } else {
+            deleteGithubService.mutate(pendingPreview.id, { onSuccess: done });
+          }
+        }}
+      />
+
       <BulkDeleteConfirmDialog
         open={!!pendingBulk}
         onOpenChange={(open) => !open && setPendingBulk(null)}
@@ -635,111 +704,8 @@ function ProjectDetail() {
         envId={selectedEnv}
         service={editingPreview}
         onClose={() => setEditingPreview(null)}
+        onSaved={() => previewDetail.refetch()}
       />
     </main>
-  );
-}
-
-function PreviewServiceEditDialog({
-  projectId,
-  envId,
-  service,
-  onClose,
-}: {
-  projectId: string;
-  envId: string;
-  service: PreviewEnvironment | null;
-  onClose: () => void;
-}) {
-  const update = useUpdatePreviewService(projectId, envId);
-  const [envText, setEnvText] = useState("");
-  const [portText, setPortText] = useState("");
-  const serviceKey = service?.source_service_id ?? "";
-  const lastKey = useRef("");
-  if (service && lastKey.current !== serviceKey) {
-    lastKey.current = serviceKey;
-    setEnvText(formatEnvLines(service.env ?? {}));
-    setPortText(String(service.port ?? ""));
-  }
-
-  const initialEnv = service ? formatEnvLines(service.env ?? {}) : "";
-  const initialPort = service ? String(service.port ?? "") : "";
-  const portNum = Number(portText);
-  const validPort =
-    portText.trim() !== "" && Number.isInteger(portNum) && portNum >= 1 && portNum <= 65535;
-  const changed = service != null && (envText !== initialEnv || portText !== initialPort);
-
-  return (
-    <Dialog
-      open={service != null}
-      onOpenChange={(open) => {
-        if (!open) {
-          onClose();
-          update.reset();
-        }
-      }}
-    >
-      <DialogContent>
-        <h3 className="text-lg font-medium text-[var(--color-text)]">
-          Update {service?.service_name ?? "preview service"}
-        </h3>
-        <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-          Applies to this preview only — the domain can&apos;t be changed here, and edits
-          reset on the next PR sync.
-        </p>
-        <form
-          className="mt-5 space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!service || !changed || !validPort || update.isPending) return;
-            const body: { env?: string; port?: number } = {};
-            if (envText !== initialEnv) body.env = envText;
-            if (portText !== initialPort) body.port = portNum;
-            update.mutate(
-              { sourceId: service.source_service_id, body },
-              { onSuccess: () => onClose() },
-            );
-          }}
-        >
-          <div>
-            <Label htmlFor="preview-port">Port</Label>
-            <Input
-              id="preview-port"
-              type="number"
-              required
-              value={portText}
-              onChange={(e) => setPortText(e.target.value)}
-              className="mt-2 font-mono"
-            />
-          </div>
-          <div>
-            <Label htmlFor="preview-env">Environment variables</Label>
-            <Textarea
-              id="preview-env"
-              value={envText}
-              onChange={(e) => setEnvText(e.target.value)}
-              placeholder={"KEY=value\nANOTHER_KEY=value"}
-              rows={6}
-              className="mt-2 font-mono"
-            />
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              One <code>KEY=value</code> pair per line. Saving replaces the full set of
-              environment variables with what&apos;s shown here.
-            </p>
-          </div>
-          {update.error && (
-            <ErrorBanner message={getErrorMessage(update.error)} />
-          )}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" type="button" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button size="sm" type="submit" disabled={!changed || !validPort || update.isPending}>
-              {update.isPending ? "Saving…" : "Save changes"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

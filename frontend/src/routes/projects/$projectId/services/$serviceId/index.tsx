@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { ServiceLogsDrawer } from "@/components/service-logs-drawer";
 import { ErrorBanner } from "@/components/error-banner";
+import { PreviewServiceEditDialog } from "@/components/preview-service-edit-dialog";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 
 export const Route = createFileRoute("/projects/$projectId/services/$serviceId/")({
@@ -37,6 +38,7 @@ function ServiceDetail() {
   const [mountPath, setMountPath] = useState("");
   const [storageGB, setStorageGB] = useState("5");
   const [logsOpen, setLogsOpen] = useState(false);
+  const [editingPreview, setEditingPreview] = useState(false);
 
   if (error) {
     return (
@@ -68,6 +70,18 @@ function ServiceDetail() {
         ← Back to project
       </Link>
 
+      {service.preview && (
+        <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--color-surface-2)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
+          <span>
+            Ephemeral preview {service.preview.name} — managed by the pull request. Edits
+            apply here only and reset on the next sync.
+          </span>
+          <span className="font-mono text-[var(--color-text-faint)]">
+            {service.preview.namespace}
+          </span>
+        </div>
+      )}
+
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-4">
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           {service.name}
@@ -90,10 +104,12 @@ function ServiceDetail() {
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
-              navigate({
-                to: "/projects/$projectId/services/$serviceId/edit",
-                params: { projectId, serviceId },
-              })
+              service.preview
+                ? setEditingPreview(true)
+                : navigate({
+                    to: "/projects/$projectId/services/$serviceId/edit",
+                    params: { projectId, serviceId },
+                  })
             }
           >
             <Pencil className="h-4 w-4" />
@@ -165,6 +181,7 @@ function ServiceDetail() {
         )}
       </section>
 
+      {!service.preview && (
       <section className="mt-8">
         <h2 className="mb-3 font-display text-lg font-semibold text-[var(--color-text)]">
           Volume
@@ -240,12 +257,13 @@ function ServiceDetail() {
           )}
         </div>
       </section>
+      )}
 
       <DeleteConfirmDialog
         open={confirmingDelete}
         onOpenChange={setConfirmingDelete}
         resourceName={service.name}
-        resourceLabel="service"
+        resourceLabel={service.preview ? "preview service" : "service"}
         pending={deleteService.isPending}
         error={deleteService.error ? getErrorMessage(deleteService.error) : undefined}
         onConfirm={() =>
@@ -262,6 +280,25 @@ function ServiceDetail() {
         serviceId={service.id}
         serviceName={service.name}
       />
+
+      {service.preview && (
+        <PreviewServiceEditDialog
+          projectId={projectId}
+          envId={service.preview.env_id}
+          service={
+            editingPreview
+              ? {
+                  sourceId: service.id,
+                  serviceName: service.name,
+                  env: service.env ?? {},
+                  port: service.port,
+                }
+              : null
+          }
+          onClose={() => setEditingPreview(false)}
+          onSaved={() => refetch()}
+        />
+      )}
     </main>
   );
 }

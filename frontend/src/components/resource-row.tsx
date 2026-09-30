@@ -22,7 +22,7 @@ type ResourceRowProps = {
   domainHref?: string;
   /** private/internal domain for services */
   privateDomain?: string;
-  /** Omitted for ephemeral rows (e.g. preview instances) — name renders as plain text. */
+  /** When present the name links to the detail page — same for prod and preview copies. */
   detailHref?: string;
   /** Omitted for read-only rows — hides the actions menu. */
   onUpdate?: () => void;

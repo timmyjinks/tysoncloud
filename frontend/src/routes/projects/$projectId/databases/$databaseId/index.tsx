@@ -51,6 +51,16 @@ function DatabaseDetail() {
       >
         ← Back to project
       </Link>
+      {database.preview && (
+        <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--color-surface-2)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
+          <span>
+            Ephemeral preview {database.preview.name} — empty copy, no production data.
+          </span>
+          <span className="font-mono text-[var(--color-text-faint)]">
+            {database.preview.namespace}
+          </span>
+        </div>
+      )}
       <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] pb-4">
         <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
           {database.name}
@@ -67,18 +77,22 @@ function DatabaseDetail() {
             </Button>
           }
         >
-          <DropdownMenuItem
-            onClick={() =>
-              navigate({
-                to: "/projects/$projectId/databases/$databaseId/edit",
-                params: { projectId, databaseId },
-              })
-            }
-          >
-            <Pencil className="h-4 w-4" />
-            Update
-          </DropdownMenuItem>
-          <div className="my-1 h-px bg-[var(--color-border)]" aria-hidden="true" />
+          {!database.preview && (
+            <>
+              <DropdownMenuItem
+                onClick={() =>
+                  navigate({
+                    to: "/projects/$projectId/databases/$databaseId/edit",
+                    params: { projectId, databaseId },
+                  })
+                }
+              >
+                <Pencil className="h-4 w-4" />
+                Update
+              </DropdownMenuItem>
+              <div className="my-1 h-px bg-[var(--color-border)]" aria-hidden="true" />
+            </>
+          )}
           <DropdownMenuItem destructive onClick={() => setConfirmingDelete(true)}>
             <Trash2 className="h-4 w-4" />
             Delete

@@ -862,7 +862,7 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		token, _ = app.Github.GetInstallationToken(ctx, strconv.FormatInt(installationId, 10))
 	}
 
-	existingEnvStr, envErr := app.Deploy.GetServiceEnv(ctx, deploy.Service{
+	prodEnvStr, envErr := app.Deploy.GetServiceEnv(ctx, deploy.Service{
 		Namespace: "proj-" + svc.ProjectId,
 		Name:      svc.ResourceName,
 	})
@@ -874,11 +874,13 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		refreshMainWithError(envErr.Error())
 		return
 	}
-	existingEnv := map[string][]byte{}
-	for k, v := range existingEnvStr {
-		existingEnv[k] = []byte(v)
-	}
-	existingEnv["PREVIEW_URL"] = []byte(previewURL)
+	// Preserve preview edits: overlay live preview env on top of prod.
+	// GetSecret returns empty map (not error) when missing = first deploy.
+	liveEnvStr, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{
+		Namespace: previewNamespace,
+		Name:      previewName,
+	})
+	existingEnv := mergePreviewEnv(prodEnvStr, liveEnvStr, previewURL)
 	slog.Info("preview deploy: env inherited", "copy_id", copy.Id, "pr", prNumber, "env_keys", len(existingEnv), "port", copy.Port)
 
 	builtImage, err := app.Github.CloneAndBuildPRWithLogs(ctx, headCloneURL, token, sanitizedRootDir, headRef, headSHA, imageTag, logFn, existingEnv)
@@ -952,6 +954,7 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 		slog.Warn("preview copy: failed to ensure preview env", "project_id", projectId, "pr", prNumber, "err", err)
 		return
 	}
+	// Lists below include copy rows too — skip them so we only copy prod.
 	copies, err := app.Supabase.GetPreviewCopyIDs(projectId)
 	if err != nil {
 		slog.Warn("preview copy: copy lookup failed", "project_id", projectId, "pr", prNumber, "err", err)
@@ -970,17 +973,14 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 			slog.Warn("preview copy: failed to remove untracked copy", "project_id", projectId, "pr", prNumber, "source", id, "err", derr)
 		}
 	}
-	copyEnv := func(prodNamespace, prodName, hostname string) map[string][]byte {
-		out := map[string][]byte{}
-		if prodEnv, err := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: prodNamespace, Name: prodName}); err != nil {
+	copyEnv := func(prodNamespace, prodName, previewNamespace, previewName, hostname string) map[string][]byte {
+		prodEnv, err := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: prodNamespace, Name: prodName})
+		if err != nil {
 			slog.Warn("preview copy: parent env lookup failed, copying without env", "namespace", prodNamespace, "name", prodName, "err", err)
-		} else {
-			for k, v := range prodEnv {
-				out[k] = []byte(v)
-			}
+			prodEnv = map[string]string{}
 		}
-		out["PREVIEW_URL"] = []byte("https://" + hostname)
-		return out
+		liveEnv, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: previewNamespace, Name: previewName})
+		return mergePreviewEnv(prodEnv, liveEnv, "https://"+hostname)
 	}
 
 	if services, err := app.Supabase.GetServicesByProjectId(projectId); err != nil {
@@ -1003,8 +1003,8 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 				Name:      previewName,
 				Hostname:  hostname,
 				Port:      copy.Port,
-				Image:     copy.Image,
-				Env:       copyEnv("proj-"+projectId, svc.ResourceName, hostname),
+				Image:     svc.Image,
+				Env:       copyEnv("proj-"+projectId, svc.ResourceName, previewNamespace, previewName, hostname),
 			}); err != nil {
 				slog.Warn("preview copy: service deploy failed", "copy_id", copy.Id, "pr", prNumber, "err", err)
 				_, _ = app.Supabase.UpdateServiceStatusById(copy.Id, "failed")
@@ -1039,7 +1039,7 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 				Hostname:  hostname,
 				Port:      copy.Port,
 				Image:     app.Github.RegistryTag(app.Github.RegistryURL(), copy.ResourceName, "latest"),
-				Env:       copyEnv("proj-"+projectId, g.ResourceName, hostname),
+				Env:       copyEnv("proj-"+projectId, g.ResourceName, previewNamespace, previewName, hostname),
 			}); err != nil {
 				slog.Warn("preview copy: github service deploy failed", "copy_id", copy.Id, "pr", prNumber, "err", err)
 				_, _ = app.Supabase.UpdateGithubServiceStatusById(copy.Id, "failed")

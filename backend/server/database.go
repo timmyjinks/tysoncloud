@@ -30,9 +30,24 @@ func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	namespace := "proj-" + database.ProjectId
+	secretName := database.ResourceName + "-app"
+	var preview *PreviewInfo
+	if env, ok := app.previewViewForCopy(databaseId); ok {
+		ns, name, _ := previewServiceTarget(database.ResourceName, databaseId, env)
+		namespace = ns
+		secretName = name + "-app"
+		preview = &PreviewInfo{
+			EnvId:     env.Id,
+			Name:      env.Name,
+			Pr:        env.Pr,
+			Namespace: env.Namespace,
+		}
+	}
+
 	env, err := app.Deploy.GetServiceEnv(r.Context(), deploy.Service{
-		Namespace: "proj-" + database.ProjectId,
-		Name:      database.ResourceName + "-app",
+		Namespace: namespace,
+		Name:      secretName,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the database's connection details.", err)
@@ -50,6 +65,7 @@ func (app *Application) GetDatabase(w http.ResponseWriter, r *http.Request) {
 		InternalDomain: database.InternalDomain,
 		Env:            env,
 		CreatedAt:      database.CreatedAt,
+		Preview:        preview,
 	}); err != nil {
 		writeError(w, http.StatusInternalServerError, msgServerError, err)
 		return
@@ -151,6 +167,11 @@ func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, ok := app.previewViewForCopy(databaseId); ok {
+		writeError(w, http.StatusBadRequest, "Databases can't be edited in preview environments.", nil)
+		return
+	}
+
 	var database DatabaseUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&database); err != nil {
 		writeError(w, http.StatusBadRequest, "That database request wasn't valid.", err)
@@ -205,6 +226,38 @@ func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 	claims, ok := clerk.SessionClaimsFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, msgUnauthorized, nil)
+		return
+	}
+
+	// Preview copies reuse the same delete UI but clean up preview infra
+	// and the environment mapping instead of prod infra.
+	if previewEnv, ok := app.previewViewForCopy(databaseId); ok {
+		before, _ := app.Supabase.GetDatabaseById(databaseId)
+		if err := app.Supabase.DeleteDatabase(databaseId, claims.Subject); err != nil {
+			writeError(w, http.StatusInternalServerError, "Couldn't delete the database.", err)
+			return
+		}
+		_ = app.Supabase.DeletePreviewEnvironmentServicesBySource(databaseId)
+		resourceName := before.ResourceName
+		if resourceName == "" {
+			resourceName = "db-" + databaseId
+		}
+		_, previewName, _ := previewServiceTarget(resourceName, databaseId, previewEnv)
+		if previewName == "" {
+			previewName = resourceName
+		}
+		engine := before.Engine
+		if engine == "" {
+			engine = "postgres"
+		}
+		if err := app.Deploy.DeleteDatabase(r.Context(), deploy.Database{
+			Namespace: previewEnv.Namespace,
+			Name:      previewName,
+			Engine:    engine,
+		}); err != nil {
+			slog.Error("failed to clean up preview database infrastructure", "database_id", databaseId, "err", err)
+		}
+		w.WriteHeader(204)
 		return
 	}
 

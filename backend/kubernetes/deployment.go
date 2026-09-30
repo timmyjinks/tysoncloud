@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/timmyjinks/tysoncloud/util"
 	corev1 "k8s.io/api/core/v1"
@@ -68,6 +69,14 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 				Name: &resource.Name,
 				Labels: map[string]string{
 					"app": resource.Name,
+				},
+				Annotations: map[string]string{
+					// Same mechanism as `kubectl rollout restart`: any
+					// Apply changes the template, so k8s rolls new pods
+					// that read the current Secret at start. Without this,
+					// secret-only changes Apply an identical template and
+					// old pods keep stale env.
+					"kubectl.kubernetes.io/restartedAt": time.Now().UTC().Format(time.RFC3339),
 				},
 			},
 			Spec: &appcorev1.PodSpecApplyConfiguration{

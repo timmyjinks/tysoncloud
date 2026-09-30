@@ -27,6 +27,7 @@ type DatabaseResponse struct {
 	InternalDomain string            `json:"internal_domain"`
 	Env            map[string]string `json:"env"`
 	CreatedAt      time.Time         `json:"created_at"`
+	Preview        *PreviewInfo      `json:"preview,omitempty"`
 }
 
 type DatabaseCreateRequest struct {
@@ -70,6 +71,7 @@ type ServiceResponse struct {
 	InternalDomain string            `json:"private_domain"`
 	Env            map[string]string `json:"env"`
 	CreatedAt      time.Time         `json:"created_at"`
+	Preview        *PreviewInfo      `json:"preview,omitempty"`
 }
 
 type ServiceCreateRequest struct {
@@ -110,6 +112,7 @@ type GithubServiceResponse struct {
 	InternalDomain string            `json:"private_domain"`
 	Env            map[string]string `json:"env"`
 	CreatedAt      time.Time         `json:"created_at"`
+	Preview        *PreviewInfo      `json:"preview,omitempty"`
 }
 
 type GithubServiceCreateRequest struct {

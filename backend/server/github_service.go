@@ -104,9 +104,33 @@ func (app *Application) GetGithubService(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	namespace := "proj-" + svc.ProjectId
+	secretName := svc.ResourceName
+	publicDomain := svc.PublicDomain
+	var preview *PreviewInfo
+	if env, ok := app.previewViewForCopy(githubServiceId); ok {
+		ns, name, hostname := previewServiceTarget(svc.ResourceName, githubServiceId, env)
+		namespace = ns
+		secretName = name
+		publicDomain = hostname
+		previewURL := "https://" + hostname
+		prURL := ""
+		if svc.RepoName != "" {
+			prURL = "https://github.com/" + svc.RepoName + "/pull/" + strconv.Itoa(env.Pr)
+		}
+		preview = &PreviewInfo{
+			EnvId:     env.Id,
+			Name:      env.Name,
+			Pr:        env.Pr,
+			Namespace: env.Namespace,
+			URL:       previewURL,
+			PrURL:     prURL,
+		}
+	}
+
 	env, err := app.Deploy.GetServiceEnv(r.Context(), deploy.Service{
-		Namespace: "proj-" + svc.ProjectId,
-		Name:      svc.ResourceName,
+		Namespace: namespace,
+		Name:      secretName,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the service's environment variables.", err)
@@ -129,10 +153,11 @@ func (app *Application) GetGithubService(w http.ResponseWriter, r *http.Request)
 		Branch:         branch,
 		Port:           svc.Port,
 		Status:         svc.Status,
-		PublicDomain:   svc.PublicDomain,
+		PublicDomain:   publicDomain,
 		InternalDomain: svc.PrivateDomain,
 		Env:            env,
 		CreatedAt:      svc.CreatedAt,
+		Preview:        preview,
 	}); err != nil {
 		writeError(w, http.StatusInternalServerError, msgServerError, err)
 		return
@@ -422,6 +447,13 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	userId := claims.Subject
 	domainRequested := req.Domain != nil
 
+	// Preview copies are edited port + env only through the preview
+	// endpoint (PreviewServiceEditDialog). The full update form is prod-only.
+	if _, ok := app.previewViewForCopy(githubServiceId); ok {
+		writeError(w, http.StatusBadRequest, "Preview services can only update port and environment variables.", nil)
+		return
+	}
+
 	existing, err := app.Supabase.GetGithubService(githubServiceId, userId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
@@ -710,6 +742,32 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 
 	svcBefore, _ := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
 
+	// Preview copies reuse the same delete UI but clean up preview infra
+	// and the environment mapping instead of prod infra.
+	if previewEnv, ok := app.previewViewForCopy(githubServiceId); ok {
+		if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
+			writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
+			return
+		}
+		_ = app.Supabase.DeletePreviewEnvironmentServicesBySource(githubServiceId)
+		resourceName := svcBefore.ResourceName
+		if resourceName == "" {
+			resourceName = "svc-" + githubServiceId
+		}
+		_, previewName, _ := previewServiceTarget(resourceName, githubServiceId, previewEnv)
+		if previewName == "" {
+			previewName = resourceName
+		}
+		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
+			Namespace: previewEnv.Namespace,
+			Name:      previewName,
+		}); err != nil {
+			slog.Error("failed to clean up preview github service infrastructure", "service_id", githubServiceId, "err", err)
+		}
+		w.WriteHeader(204)
+		return
+	}
+
 	if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
 		return
@@ -888,10 +946,19 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	status := strings.ToLower(strings.TrimSpace(svc.Status))
 	isPreDeploy := status == "pending" || status == "building" || status == "deploying" || status == ""
+	buildLogID := svc.Id
+	namespace := "proj-" + projectId
+	deployName := svc.ResourceName
+	if env, ok := app.previewViewForCopy(githubServiceId); ok {
+		ns, n, _ := previewServiceTarget(svc.ResourceName, githubServiceId, env)
+		namespace = ns
+		deployName = n
+		buildLogID = previewBuildLogID(githubServiceId, env.Pr)
+	}
 	if isPreDeploy {
 		lines := make(chan string, 64)
-		subID, ch, snap := app.Github.SubscribeBuildLogs(svc.Id)
-		defer app.Github.UnsubscribeBuildLogs(svc.Id, subID)
+		subID, ch, snap := app.Github.SubscribeBuildLogs(buildLogID)
+		defer app.Github.UnsubscribeBuildLogs(buildLogID, subID)
 		stateLine := `[state] ` + svc.Status + ` repo=` + svc.RepoName + ` branch=` + svc.Branch + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
 		go func() {
 			defer close(lines)
@@ -945,8 +1012,8 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 	go func() {
 		defer close(lines)
 		svcRes := deploy.Service{
-			Namespace: "proj-" + projectId,
-			Name:      svc.ResourceName,
+			Namespace: namespace,
+			Name:      deployName,
 		}
 		isDiagnostic := status == "pending" || status == "failed"
 		var logErr error

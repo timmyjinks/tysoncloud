@@ -78,6 +78,13 @@ func (s *SupabaseStore) EnsureServiceCopy(ownerId string, src ServicesTable, prN
 	if all, err := s.GetServicesByProjectId(src.ProjectId); err == nil {
 		for _, v := range all {
 			if v.Name == name {
+				// Keep the copy tracking prod's image (port stays
+				// preview-owned via the preview edit endpoint).
+				if v.Image != src.Image {
+					if updated, uerr := s.UpdateServiceImageById(v.Id, src.Image); uerr == nil {
+						return updated, nil
+					}
+				}
 				return v, nil
 			}
 		}
@@ -122,6 +129,25 @@ func (s *SupabaseStore) EnsureDatabaseCopy(ownerId string, src DatabasesTable, p
 func (s *SupabaseStore) UpdateServiceStatusById(id, status string) (ServicesTable, error) {
 	res, _, err := s.cli.From("services").
 		Update(map[string]interface{}{"status": status}, "", "").
+		Eq("id", id).
+		Execute()
+	if err != nil {
+		return ServicesTable{}, err
+	}
+	var arr []ServicesTable
+	if err := json.Unmarshal(res, &arr); err == nil && len(arr) == 1 {
+		return arr[0], nil
+	}
+	var single ServicesTable
+	if err := json.Unmarshal(res, &single); err != nil {
+		return ServicesTable{}, err
+	}
+	return single, nil
+}
+
+func (s *SupabaseStore) UpdateServiceImageById(id, image string) (ServicesTable, error) {
+	res, _, err := s.cli.From("services").
+		Update(map[string]interface{}{"image": image}, "", "").
 		Eq("id", id).
 		Execute()
 	if err != nil {

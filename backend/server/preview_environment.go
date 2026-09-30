@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
@@ -56,6 +58,26 @@ func previewSecretName(src store.PreviewSource, previewName string) string {
 		return previewName + "-app"
 	}
 	return previewName
+}
+
+// mergePreviewEnv preserves preview edits across redeploys: start from prod,
+// overlay live preview keys, force PREVIEW_URL. First deploy (live==nil/empty)
+// is just prod + PREVIEW_URL.
+func mergePreviewEnv(prod, live map[string]string, previewURL string) map[string][]byte {
+	merged := map[string][]byte{}
+	for k, v := range prod {
+		merged[k] = []byte(v)
+	}
+	for k, v := range live {
+		if k == PreviewURLKey {
+			continue
+		}
+		merged[k] = []byte(v)
+	}
+	if previewURL != "" {
+		merged[PreviewURLKey] = []byte(previewURL)
+	}
+	return merged
 }
 
 func (app *Application) resolvePreviewEnv(ctx context.Context, env store.PreviewEnvironment, src store.PreviewSource, hostname string) (map[string]string, error) {
@@ -303,47 +325,69 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 	}
 
 	if req.Env != nil {
-		next := map[string][]byte{}
+		next := map[string]string{}
 		for k, v := range util.ParseEnv(*req.Env) {
-			next[k] = v
+			next[k] = string(v)
 		}
-		next[PreviewURLKey] = []byte(previewURL)
-		if err := app.Deploy.UpsertSecret(ctx, env.Namespace, secretName, next); err != nil {
-			writeError(w, http.StatusInternalServerError, "Couldn't save the preview's environment variables.", err)
-			return
-		}
-		current = map[string]string{}
-		for k, v := range next {
-			current[k] = string(v)
-		}
+		next[PreviewURLKey] = previewURL
+		current = next
 	}
 
 	port := src.Port
 	if req.Port != nil {
 		port = *req.Port
 	}
+	// Same as normal services: deploy with the image from the source of
+	// truth (prod), not the stale live deployment — the image change is
+	// what rolls the pods. Port stays preview-owned.
+	image := ""
+	if child.SourceType == "service" {
+		baseName := strings.TrimSuffix(src.Name, fmt.Sprintf("-pr-%d", env.Pr))
+		if prods, perr := app.Supabase.GetProductionServicesByProjectId(src.ProjectId); perr == nil {
+			for _, p := range prods {
+				if p.Name == baseName {
+					image = p.Image
+					break
+				}
+			}
+		}
+		if image != "" {
+			if copyRow, cerr := app.Supabase.GetServiceById(child.SourceServiceId); cerr == nil && copyRow.Image != image {
+				if updated, uerr := app.Supabase.UpdateServiceImageById(child.SourceServiceId, image); uerr == nil {
+					_ = updated
+				} else {
+					slog.Warn("preview: copy row image update failed", "source", child.SourceServiceId, "err", uerr)
+				}
+			}
+		} else if copyRow, cerr := app.Supabase.GetServiceById(child.SourceServiceId); cerr == nil {
+			image = copyRow.Image
+		}
+	} else {
+		// Github copies have no image column — the live deployment runs
+		// the PR-built tag, which is the newest image. Keep it.
+		image, err = app.Deploy.GetServiceImage(ctx, env.Namespace, previewName)
+	}
+	if image == "" {
+		writeError(w, http.StatusInternalServerError, "Couldn't update the preview's port.", err)
+		return
+	}
+	envBytes := map[string][]byte{}
+	for k, v := range current {
+		envBytes[k] = []byte(v)
+	}
+	envBytes[PreviewURLKey] = []byte(previewURL)
+	if err := app.Deploy.CreateService(ctx, deploy.Service{
+		Namespace: env.Namespace,
+		Name:      previewName,
+		Hostname:  hostname,
+		Port:      port,
+		Image:     image,
+		Env:       envBytes,
+	}); err != nil {
+		writeError(w, http.StatusInternalServerError, "We saved your changes, but couldn't restart the preview. A refresh will show its current status.", err)
+		return
+	}
 	if port != src.Port {
-		image, err := app.Deploy.GetServiceImage(ctx, env.Namespace, previewName)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "Couldn't update the preview's port.", err)
-			return
-		}
-		envBytes := map[string][]byte{}
-		for k, v := range current {
-			envBytes[k] = []byte(v)
-		}
-		envBytes[PreviewURLKey] = []byte(previewURL)
-		if err := app.Deploy.CreateService(ctx, deploy.Service{
-			Namespace: env.Namespace,
-			Name:      previewName,
-			Hostname:  hostname,
-			Port:      port,
-			Image:     image,
-			Env:       envBytes,
-		}); err != nil {
-			writeError(w, http.StatusInternalServerError, "We saved your changes, but couldn't restart the preview. A refresh will show its current status.", err)
-			return
-		}
 		src.Port = port
 		var perr error
 		if child.SourceType == "service" {

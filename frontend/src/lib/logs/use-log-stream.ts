@@ -101,3 +101,13 @@ export function useGithubLogStream(projectId: string, githubServiceId: string, e
   const wsPath = `/projects/${projectId}/github_services/${githubServiceId}/logs`;
   return useGenericLogStream(wsPath, enabled, [projectId, githubServiceId]);
 }
+
+export function usePreviewServiceLogStream(
+  projectId: string,
+  envId: string,
+  sourceId: string,
+  enabled: boolean,
+) {
+  const wsPath = `/projects/${projectId}/preview_environments/${envId}/services/${sourceId}/logs`;
+  return useGenericLogStream(wsPath, enabled, [projectId, envId, sourceId]);
+}

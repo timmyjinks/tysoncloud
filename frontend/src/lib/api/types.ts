@@ -11,15 +11,6 @@ export type ProjectUpdateRequest = {
   name?: string;
 };
 
-export type PreviewInfo = {
-  env_id: string;
-  name: string;
-  pr: number;
-  namespace: string;
-  url?: string;
-  pr_url?: string;
-};
-
 export type Service = {
   id: string;
   project_id: string;
@@ -31,7 +22,6 @@ export type Service = {
   private_domain: string; // conceptually "internal_domain"
   env: Record<string, string>;
   created_at: string;
-  preview?: PreviewInfo | null;
 };
 
 export type ServiceCreateRequest = {
@@ -60,7 +50,6 @@ export type Database = {
   internal_domain: string;
   env: Record<string, string>;
   created_at: string;
-  preview?: PreviewInfo | null;
 };
 
 export type DatabaseCreateRequest = {
@@ -117,7 +106,6 @@ export type GithubService = {
   private_domain: string;
   env: Record<string, string>;
   created_at: string;
-  preview?: PreviewInfo | null;
 };
 
 export type GithubServiceCreateRequest = {

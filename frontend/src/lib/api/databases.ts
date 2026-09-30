@@ -15,11 +15,11 @@ export function useDatabases(projectId: string) {
   });
 }
 
-export function useDatabase(id: string) {
+export function useDatabase(id: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: databaseKeys.detail(id),
     queryFn: () => api.get<Database>(`/databases/${id}`),
-    enabled: !!id,
+    enabled: !!id && (opts?.enabled ?? true),
   });
 }
 

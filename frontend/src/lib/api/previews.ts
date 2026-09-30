@@ -43,3 +43,17 @@ export function useUpdatePreviewService(projectId: string, envId: string) {
     },
   });
 }
+
+export function useDeletePreviewService(projectId: string, envId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) =>
+      api.delete<void>(
+        `/projects/${projectId}/preview_environments/${envId}/services/${sourceId}`,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: previewKeys.detail(projectId, envId) });
+      qc.invalidateQueries({ queryKey: previewKeys.byProject(projectId) });
+    },
+  });
+}

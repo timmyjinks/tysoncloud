@@ -19,6 +19,7 @@ import {
   useGithubServices,
 } from "@/lib/api/github";
 import {
+  useDeletePreviewService,
   useProjectPreviewEnvironment,
   useProjectPreviewEnvironments,
 } from "@/lib/api/previews";
@@ -114,6 +115,10 @@ function ProjectDetail() {
   }, [previewDetail.error, selectedEnv]);
   const selectedPreviewEnv = previewDetail.data ?? null;
   const isPreviewMode = selectedEnv !== "production";
+  const deletePreview = useDeletePreviewService(
+    projectId,
+    isPreviewMode ? selectedEnv : "",
+  );
 
   const isLoading = servicesLoading || databasesLoading || githubServicesLoading;
 
@@ -549,14 +554,15 @@ function ProjectDetail() {
                 ) : (
                   <Github className="h-5 w-5" />
                 );
-                // Same detail/delete pages as prod — a preview copy is a real
-                // service row, the backend resolves it to the preview
-                // namespace. Update stays port + env only via the dialog.
+                // Preview copies are rendered from the preview detail API, not
+                // the prod endpoints. Links carry the env so detail pages
+                // stay in preview mode; deletes go through the preview
+                // endpoint which cleans infra + mapping + empty envs.
                 const detailHref = isDb
-                  ? `/projects/${projectId}/databases/${s.source_service_id}`
+                  ? `/projects/${projectId}/databases/${s.source_service_id}?env=${s.preview_env_id}`
                   : isSvc
-                    ? `/projects/${projectId}/services/${s.source_service_id}`
-                    : `/projects/${projectId}/github_services/${s.source_service_id}`;
+                    ? `/projects/${projectId}/services/${s.source_service_id}?env=${s.preview_env_id}`
+                    : `/projects/${projectId}/github_services/${s.source_service_id}?env=${s.preview_env_id}`;
                 return (
                   <ResourceRow
                     key={`preview-${s.preview_env_id}-${s.source_service_id}`}
@@ -659,20 +665,8 @@ function ProjectDetail() {
         resourceLabel={
           pendingPreview?.kind === "database" ? "database" : "preview service"
         }
-        pending={
-          deleteService.isPending ||
-          deleteDatabase.isPending ||
-          deleteGithubService.isPending
-        }
-        error={
-          pendingPreview?.kind === "service" && deleteService.error
-            ? getErrorMessage(deleteService.error)
-            : pendingPreview?.kind === "database" && deleteDatabase.error
-              ? getErrorMessage(deleteDatabase.error)
-              : pendingPreview?.kind === "github_service" && deleteGithubService.error
-                ? getErrorMessage(deleteGithubService.error)
-                : undefined
-        }
+        pending={deletePreview.isPending}
+        error={deletePreview.error ? getErrorMessage(deletePreview.error) : undefined}
         onConfirm={() => {
           if (!pendingPreview) return;
           const done = () => {
@@ -680,13 +674,7 @@ function ProjectDetail() {
             previewDetail.refetch();
             refetchPreviewEnvs();
           };
-          if (pendingPreview.kind === "service") {
-            deleteService.mutate(pendingPreview.id, { onSuccess: done });
-          } else if (pendingPreview.kind === "database") {
-            deleteDatabase.mutate(pendingPreview.id, { onSuccess: done });
-          } else {
-            deleteGithubService.mutate(pendingPreview.id, { onSuccess: done });
-          }
+          deletePreview.mutate(pendingPreview.id, { onSuccess: done });
         }}
       />
 

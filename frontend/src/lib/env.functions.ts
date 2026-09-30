@@ -13,8 +13,9 @@ export interface PublicRuntimeEnv {
  * on edge runtimes). Only the two public values cross to the client; real
  * secrets must never be added to this return.
  *
- * Empty string means "not configured here" — the client merges this with
- * the build-time `import.meta.env` values and validates the result.
+ * Runtime-only: the client uses these values directly and validates the
+ * result. There is no build-time `import.meta.env` fallback and no
+ * `/env.js` / `window.__ENV__` injection.
  * VITE_* names are read first so existing k8s Secrets keep working as-is.
  */
 export const getRuntimeEnv = createServerFn({ method: "GET" }).handler(

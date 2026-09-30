@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 type DatabasesTable struct {
@@ -167,4 +168,18 @@ func (s *SupabaseStore) DeleteDatabase(id, userId string) error {
 	}
 
 	return nil
+}
+
+// GetProductionDatabases returns only prod rows, excluding preview copies
+// tracked in preview_environment_services.
+func (s *SupabaseStore) GetProductionDatabases(projectId, userId string) ([]DatabasesTable, error) {
+	databases, err := s.GetDatabases(projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := s.GetPreviewCopyIDs(projectId)
+	if err != nil {
+		return databases, nil
+	}
+	return util.FilterPreviewCopies(databases, func(v DatabasesTable) string { return v.Id }, copies), nil
 }

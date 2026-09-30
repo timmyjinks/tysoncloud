@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 type GithubServicesTable struct {
@@ -260,4 +261,18 @@ func (s *SupabaseStore) GetGithubServiceById(id string) (GithubServicesTable, er
 	}
 
 	return table, nil
+}
+
+// GetProductionGithubServices returns only prod rows, excluding preview copies
+// tracked in preview_environment_services.
+func (s *SupabaseStore) GetProductionGithubServices(projectId, userId string) ([]GithubServicesTable, error) {
+	services, err := s.GetGithubServices(projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := s.GetPreviewCopyIDs(projectId)
+	if err != nil {
+		return services, nil
+	}
+	return util.FilterPreviewCopies(services, func(v GithubServicesTable) string { return v.Id }, copies), nil
 }

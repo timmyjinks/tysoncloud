@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 type ServicesTable struct {
@@ -194,11 +195,24 @@ func (s *SupabaseStore) DeleteService(id, userId string) error {
 		"p_id":      id,
 		"p_user_id": userId,
 	})
-
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
 		return rpcError("delete_service", pgErr)
 	}
 
 	return nil
+}
+
+// GetProductionServices returns only prod rows, excluding preview copies
+// tracked in preview_environment_services.
+func (s *SupabaseStore) GetProductionServices(projectId, userId string) ([]ServicesTable, error) {
+	services, err := s.GetServices(projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := s.GetPreviewCopyIDs(projectId)
+	if err != nil {
+		return services, nil
+	}
+	return util.FilterPreviewCopies(services, func(v ServicesTable) string { return v.Id }, copies), nil
 }

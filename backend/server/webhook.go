@@ -880,7 +880,7 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		Namespace: previewNamespace,
 		Name:      previewName,
 	})
-	existingEnv := mergePreviewEnv(prodEnvStr, liveEnvStr, previewURL)
+	existingEnv := util.MergePreviewEnv(prodEnvStr, liveEnvStr, previewURL)
 	slog.Info("preview deploy: env inherited", "copy_id", copy.Id, "pr", prNumber, "env_keys", len(existingEnv), "port", copy.Port)
 
 	builtImage, err := app.Github.CloneAndBuildPRWithLogs(ctx, headCloneURL, token, sanitizedRootDir, headRef, headSHA, imageTag, logFn, existingEnv)
@@ -980,7 +980,7 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 			prodEnv = map[string]string{}
 		}
 		liveEnv, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: previewNamespace, Name: previewName})
-		return mergePreviewEnv(prodEnv, liveEnv, "https://"+hostname)
+		return util.MergePreviewEnv(prodEnv, liveEnv, "https://"+hostname)
 	}
 
 	if services, err := app.Supabase.GetServicesByProjectId(projectId); err != nil {

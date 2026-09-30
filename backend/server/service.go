@@ -36,27 +36,9 @@ func (app *Application) GetService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	namespace := "proj-" + service.ProjectId
-	secretName := service.ResourceName
-	publicDomain := service.PublicDomain
-	var preview *PreviewInfo
-	if env, ok := app.previewViewForCopy(serviceId); ok {
-		ns, name, hostname := previewServiceTarget(service.ResourceName, serviceId, env)
-		namespace = ns
-		secretName = name
-		publicDomain = hostname
-		preview = &PreviewInfo{
-			EnvId:     env.Id,
-			Name:      env.Name,
-			Pr:        env.Pr,
-			Namespace: env.Namespace,
-			URL:       "https://" + hostname,
-		}
-	}
-
 	env, err := app.Deploy.GetServiceEnv(r.Context(), deploy.Service{
-		Namespace: namespace,
-		Name:      secretName,
+		Namespace: "proj-" + service.ProjectId,
+		Name:      service.ResourceName,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the service's environment variables.", err)
@@ -71,11 +53,10 @@ func (app *Application) GetService(w http.ResponseWriter, r *http.Request) {
 		Image:          service.Image,
 		Port:           service.Port,
 		Status:         service.Status,
-		PublicDomain:   publicDomain,
+		PublicDomain:   service.PublicDomain,
 		InternalDomain: service.PrivateDomain,
 		Env:            env,
 		CreatedAt:      service.CreatedAt,
-		Preview:        preview,
 	}); err != nil {
 		writeError(w, http.StatusInternalServerError, msgServerError, err)
 		return
@@ -95,13 +76,10 @@ func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services, err := app.Supabase.GetServices(projectId, claims.Subject)
+	services, err := app.Supabase.GetProductionServices(projectId, claims.Subject)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's services.", err)
 		return
-	}
-	if copies, cerr := app.Supabase.GetPreviewCopyIDs(projectId); cerr == nil {
-		services = filterPreviewCopies(services, func(s store.ServicesTable) string { return s.Id }, copies)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -166,19 +144,12 @@ func (app *Application) GetServiceLogs(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	namespace := "proj-" + projectId
-	name := service.ResourceName
-	if env, ok := app.previewViewForCopy(serviceId); ok {
-		ns, n, _ := previewServiceTarget(service.ResourceName, serviceId, env)
-		namespace = ns
-		name = n
-	}
 	lines := make(chan string)
 	go func() {
 		defer close(lines)
 		svc := deploy.Service{
-			Namespace: namespace,
-			Name:      name,
+			Namespace: "proj-" + projectId,
+			Name:      service.ResourceName,
 		}
 		status := strings.ToLower(strings.TrimSpace(service.Status))
 		isDiagnostic := status == "pending" || status == "failed"
@@ -359,13 +330,6 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 
 	userId := claims.Subject
 
-	// Preview copies are edited port + env only through the preview
-	// endpoint (PreviewServiceEditDialog). The full update form is prod-only.
-	if _, ok := app.previewViewForCopy(serviceId); ok {
-		writeError(w, http.StatusBadRequest, "Preview services can only update port and environment variables.", nil)
-		return
-	}
-
 	domainRequested := service.Domain != nil
 
 	res, err := app.Supabase.UpdateService(serviceId, userId, *service.Name, *service.Image, service.Domain, *service.Port)
@@ -423,36 +387,6 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 	claims, ok := clerk.SessionClaimsFromContext(r.Context())
 	if !ok {
 		writeError(w, http.StatusUnauthorized, msgUnauthorized, nil)
-		return
-	}
-
-	// Preview copies reuse the same delete UI but clean up preview infra
-	// and the environment mapping instead of prod infra.
-	if previewEnv, ok := app.previewViewForCopy(serviceId); ok {
-		before, _ := app.Supabase.GetServiceById(serviceId)
-		if err := app.Supabase.DeleteService(serviceId, claims.Subject); err != nil {
-			writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
-			return
-		}
-		_ = app.Supabase.DeletePreviewEnvironmentServicesBySource(serviceId)
-		resourceName := before.ResourceName
-		if resourceName == "" {
-			resourceName = "svc-" + serviceId
-		}
-		_, previewName, _ := previewServiceTarget(resourceName, serviceId, previewEnv)
-		// previewServiceTarget already applies PreviewResourceName; when the
-		// stored resource name is already the k8s name, recomputing keeps it
-		// stable. Fall back to direct name if empty.
-		if previewName == "" {
-			previewName = resourceName
-		}
-		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
-			Namespace: previewEnv.Namespace,
-			Name:      previewName,
-		}); err != nil {
-			slog.Error("failed to clean up preview service infrastructure", "service_id", serviceId, "err", err)
-		}
-		w.WriteHeader(204)
 		return
 	}
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ingestLogChunk } from "./log-buffer";
-import { getEnv } from "../env";
 
+const API_URL = window.__ENV__?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
 const MAX_LINES = 5000;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15000;
@@ -10,7 +10,7 @@ const RECONNECT_MAX_MS = 15000;
 export type LogStreamStatus = "connecting" | "open" | "closed" | "error";
 
 function wsUrl(path: string) {
-  const base = getEnv().apiUrl || window.location.origin;
+  const base = API_URL || window.location.origin;
   const url = new URL(path, base);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   return url.toString();

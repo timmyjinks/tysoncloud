@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 type DatabasesTable struct {
@@ -16,6 +17,7 @@ type DatabasesTable struct {
 	InternalDomain string    `json:"internal_domain"`
 	Port           int32     `json:"port"`
 	StorageGB      int32     `json:"storage"`
+	Production     *bool     `json:"production,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -25,6 +27,24 @@ func (s *SupabaseStore) GetDatabase(id, userId string) (DatabasesTable, error) {
 		Eq("id", id).
 		Eq("projects.user_id", userId).
 		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Single().
+		Execute()
+	if err != nil {
+		return DatabasesTable{}, err
+	}
+
+	var table DatabasesTable
+	if err := json.Unmarshal(res, &table); err != nil {
+		return DatabasesTable{}, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetDatabaseById(id string) (DatabasesTable, error) {
+	res, _, err := s.cli.From("databases").
+		Select("*", "exact", false).
+		Eq("id", id).
 		Single().
 		Execute()
 	if err != nil {
@@ -57,6 +77,39 @@ func (s *SupabaseStore) GetDatabases(projectId, userId string) ([]DatabasesTable
 	}
 
 	return table, nil
+}
+
+func (s *SupabaseStore) GetDatabasesByProjectId(projectId string) ([]DatabasesTable, error) {
+	res, _, err := s.cli.From("databases").
+		Select("*", "exact", false).
+		Eq("project_id", projectId).
+		Order("created_at", &postgrest.OrderOpts{Ascending: false}).
+		Execute()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var table []DatabasesTable = []DatabasesTable{}
+	if err := json.Unmarshal(res, &table); err != nil {
+		return nil, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetProductionDatabasesByProjectId(projectId string) ([]DatabasesTable, error) {
+	all, err := s.GetDatabasesByProjectId(projectId)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]DatabasesTable, 0, len(all))
+	for _, db := range all {
+		if IsProductionRow(db.Production) {
+			out = append(out, db)
+		}
+	}
+	return out, nil
 }
 
 func (s *SupabaseStore) CreateDatabase(userId, projectId, name, engine string, port, storageGB int32) (DatabasesTable, error) {
@@ -115,4 +168,18 @@ func (s *SupabaseStore) DeleteDatabase(id, userId string) error {
 	}
 
 	return nil
+}
+
+// GetProductionDatabases returns only prod rows, excluding preview copies
+// tracked in preview_environment_services.
+func (s *SupabaseStore) GetProductionDatabases(projectId, userId string) ([]DatabasesTable, error) {
+	databases, err := s.GetDatabases(projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := s.GetPreviewCopyIDs(projectId)
+	if err != nil {
+		return databases, nil
+	}
+	return util.FilterPreviewCopies(databases, func(v DatabasesTable) string { return v.Id }, copies), nil
 }

@@ -26,6 +26,81 @@ func ValidateDomainLabel(label string) (bool, error) {
 	return domainLabelRegex.MatchString(label), nil
 }
 
+func ShortServiceID(id string) string {
+	v := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(id), "-", ""))
+	v = strings.TrimPrefix(v, "svc")
+	v = strings.Trim(v, "-")
+	if v == "" {
+		return "svc"
+	}
+	var b strings.Builder
+	for _, r := range v {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+	}
+	s := b.String()
+	if s == "" {
+		return "svc"
+	}
+	if len(s) > 8 {
+		s = s[:8]
+	}
+	return s
+}
+
+func PreviewResourceName(resourceName string, prNumber int) string {
+	base := strings.ToLower(strings.TrimSpace(resourceName))
+	base = strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			return r
+		}
+		return '-'
+	}, base)
+	base = strings.Trim(base, "-")
+	if base == "" {
+		base = "svc"
+	}
+	suffix := fmt.Sprintf("-pr-%d", prNumber)
+	if len(base)+len(suffix) > 63 {
+		base = strings.Trim(base[:63-len(suffix)], "-")
+	}
+	return base + suffix
+}
+
+func PreviewNamespaceForRepo(repoID int64, prNumber int) string {
+	ns := fmt.Sprintf("prev-r%d-pr-%d", repoID, prNumber)
+	if len(ns) > 63 {
+		ns = strings.Trim(ns[:63], "-")
+	}
+	return ns
+}
+
+// Deprecated: use PreviewNamespaceForRepo.
+func PreviewNamespace(serviceID string, prNumber int) string {
+	base := fmt.Sprintf("prev-%s", ShortServiceID(serviceID))
+	suffix := fmt.Sprintf("-pr-%d", prNumber)
+	if len(base)+len(suffix) > 63 {
+		base = strings.Trim(base[:63-len(suffix)], "-")
+	}
+	return base + suffix
+}
+
+func PreviewHostname(serviceID string, prNumber int) string {
+	return fmt.Sprintf("tc-preview-%s-pr-%d.tysonjenkins.dev", ShortServiceID(serviceID), prNumber)
+}
+
+func ShortSHA(sha string) string {
+	s := strings.TrimSpace(sha)
+	if s == "" {
+		return "latest"
+	}
+	if len(s) > 12 {
+		s = s[:12]
+	}
+	return strings.ToLower(s)
+}
+
 func NormalizeDomain(raw string) string {
 	v := strings.TrimSpace(strings.ToLower(raw))
 	if v == "" {

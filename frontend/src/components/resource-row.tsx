@@ -22,9 +22,11 @@ type ResourceRowProps = {
   domainHref?: string;
   /** private/internal domain for services */
   privateDomain?: string;
-  detailHref: string;
-  onUpdate: () => void;
-  onDelete: () => void;
+  /** When present the name links to the detail page — same for prod and preview copies. */
+  detailHref?: string;
+  /** Omitted for read-only rows — hides the actions menu. */
+  onUpdate?: () => void;
+  onDelete?: () => void;
   /** When provided, renders a selection checkbox at the start of the row. */
   selected?: boolean;
   onToggleSelect?: () => void;
@@ -69,12 +71,18 @@ export function ResourceRow({
         {icon}
       </span>
 
-      <Link
-        to={detailHref}
-        className="w-44 shrink-0 truncate font-sans text-lg font-medium text-[var(--color-text)] hover:text-[var(--color-accent)]"
-      >
-        {name}
-      </Link>
+      {detailHref ? (
+        <Link
+          to={detailHref}
+          className="w-44 shrink-0 truncate font-sans text-lg font-medium text-[var(--color-text)] hover:text-[var(--color-accent)]"
+        >
+          {name}
+        </Link>
+      ) : (
+        <span className="w-44 shrink-0 truncate font-sans text-lg font-medium text-[var(--color-text)]">
+          {name}
+        </span>
+      )}
 
       <span className="w-24 shrink-0">{status && <StatusPill status={status} />}</span>
 
@@ -124,28 +132,36 @@ export function ResourceRow({
         )}
       </span>
 
-      <DropdownMenu
-        trigger={
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Actions for ${name}`}
-            className="h-9 w-9 shrink-0 text-[var(--color-text-faint)]"
-          >
-            <MoreVertical className="h-5 w-5" />
-          </Button>
-        }
-      >
-        <DropdownMenuItem onClick={onUpdate}>
-          <Pencil className="h-4 w-4" />
-          Update
-        </DropdownMenuItem>
-        <div className="my-1 h-px bg-[var(--color-border)]" aria-hidden="true" />
-        <DropdownMenuItem destructive onClick={onDelete}>
-          <Trash2 className="h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenu>
+      {(onUpdate || onDelete) && (
+        <DropdownMenu
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${name}`}
+              className="h-9 w-9 shrink-0 text-[var(--color-text-faint)]"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          }
+        >
+          {onUpdate && (
+            <DropdownMenuItem onClick={onUpdate}>
+              <Pencil className="h-4 w-4" />
+              Update
+            </DropdownMenuItem>
+          )}
+          {onUpdate && onDelete && (
+            <div className="my-1 h-px bg-[var(--color-border)]" aria-hidden="true" />
+          )}
+          {onDelete && (
+            <DropdownMenuItem destructive onClick={onDelete}>
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          )}
+        </DropdownMenu>
+      )}
     </div>
   );
 }

@@ -81,6 +81,7 @@ function EditGithubServicePage() {
               navigate({
                 to: "/projects/$projectId/github_services/$githubServiceId",
                 params: { projectId, githubServiceId },
+                search: { env: undefined },
               }),
           },
         );

@@ -9,6 +9,10 @@ func rpcError(op string, pgErr PostgrestError) error {
 	return fmt.Errorf("%s failed: %s", op, pgErr.Message)
 }
 
+func errUnknownPreviewSourceType(t string) error {
+	return fmt.Errorf("unknown preview source type %q", t)
+}
+
 func GetPostgresErrorMessage(msg string) (string, bool) {
 	lower := strings.ToLower(msg)
 	switch {

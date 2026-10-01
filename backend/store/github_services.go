@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
+	"github.com/timmyjinks/tysoncloud/util"
 )
 
 type GithubServicesTable struct {
@@ -22,6 +23,7 @@ type GithubServicesTable struct {
 	Port               int32     `json:"port"`
 	RootDir            string    `json:"root_dir"`
 	Branch             string    `json:"branch"`
+	Production         *bool     `json:"production,omitempty"`
 	CreatedAt          time.Time `json:"created_at"`
 }
 
@@ -118,6 +120,23 @@ func (s *SupabaseStore) GetGithubServicesByRepoId(repoId int64) ([]GithubService
 	res, _, err := s.cli.From("github_services").
 		Select("*", "exact", false).
 		Eq("repo_id", strconv.FormatInt(repoId, 10)).
+		Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	var table []GithubServicesTable = []GithubServicesTable{}
+	if err := json.Unmarshal(res, &table); err != nil {
+		return nil, err
+	}
+
+	return table, nil
+}
+
+func (s *SupabaseStore) GetGithubServicesByProjectId(projectId string) ([]GithubServicesTable, error) {
+	res, _, err := s.cli.From("github_services").
+		Select("*", "exact", false).
+		Eq("project_id", projectId).
 		Execute()
 	if err != nil {
 		return nil, err
@@ -242,4 +261,18 @@ func (s *SupabaseStore) GetGithubServiceById(id string) (GithubServicesTable, er
 	}
 
 	return table, nil
+}
+
+// GetProductionGithubServices returns only prod rows, excluding preview copies
+// tracked in preview_environment_services.
+func (s *SupabaseStore) GetProductionGithubServices(projectId, userId string) ([]GithubServicesTable, error) {
+	services, err := s.GetGithubServices(projectId, userId)
+	if err != nil {
+		return nil, err
+	}
+	copies, err := s.GetPreviewCopyIDs(projectId)
+	if err != nil {
+		return services, nil
+	}
+	return util.FilterPreviewCopies(services, func(v GithubServicesTable) string { return v.Id }, copies), nil
 }

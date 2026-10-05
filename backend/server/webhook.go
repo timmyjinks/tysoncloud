@@ -336,7 +336,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		case "closed":
 			prNumber := payload.Number
 			repoFullName := payload.Repository.FullName
-			previews, _ := app.Supabase.GetPreviewServiceViewsByRepoPR(payload.Repository.Id, prNumber)
+			previews, _ := app.Supabase.GetPreviewEnvironmentViewsByRepoPR(payload.Repository.Id, prNumber)
 			go app.cleanupPRPreviews(installationId, payload.Repository.Id, repoFullName, prNumber, previews)
 			w.WriteHeader(http.StatusOK)
 			return
@@ -570,7 +570,7 @@ func clearPreviewError(repoId int64, prNumber int, serviceId string) {
 	delete(previewErrs, previewErrKey(repoId, prNumber, serviceId))
 }
 
-func snapshotPreviewErrors(repoId int64, prNumber int, views []store.PreviewServiceView) map[string]string {
+func snapshotPreviewErrors(repoId int64, prNumber int, views []store.PreviewEnvironmentView) map[string]string {
 	previewErrMu.Lock()
 	defer previewErrMu.Unlock()
 	out := make(map[string]string, len(views))
@@ -699,14 +699,14 @@ func (app *Application) upsertPreviewMainComment(ctx context.Context, token, rep
 	lock := previewCommentLock(repoId, prNumber)
 	lock.Lock()
 	defer lock.Unlock()
-	views, _ := app.Supabase.GetPreviewServiceViewsByRepoPR(repoId, prNumber)
+	views, _ := app.Supabase.GetPreviewEnvironmentViewsByRepoPR(repoId, prNumber)
 	errs := snapshotPreviewErrors(repoId, prNumber, views)
 	headSHA, _, _ := app.fetchPRHead(ctx, token, repoFullName, prNumber)
 	lines := make([]previewCommentLine, 0, len(views))
 	for _, v := range views {
-		src, err := app.Supabase.GetPreviewSource(v.Service.SourceType, v.Service.SourceServiceId)
+		src, err := app.Supabase.GetPreviewEnvironmentSource(v.Service.SourceType, v.Service.SourceServiceId)
 		if err != nil {
-			slog.Warn("preview comment: source lookup failed", "env_id", v.Env.Id, "source", v.Service.SourceServiceId, "err", err)
+			slog.Warn("preview comment: source lookup failed", "env_id", v.Environment.Id, "source", v.Service.SourceServiceId, "err", err)
 			continue
 		}
 		lines = append(lines, previewCommentLine{
@@ -862,7 +862,7 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		token, _ = app.Github.GetInstallationToken(ctx, strconv.FormatInt(installationId, 10))
 	}
 
-	prodEnvStr, envErr := app.Deploy.GetServiceEnv(ctx, deploy.Service{
+	baseEnvStr, envErr := app.Deploy.GetServiceEnv(ctx, deploy.Service{
 		Namespace: "proj-" + svc.ProjectId,
 		Name:      svc.ResourceName,
 	})
@@ -874,13 +874,13 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		refreshMainWithError(envErr.Error())
 		return
 	}
-	// Preserve preview edits: overlay live preview env on top of prod.
+	// Preserve preview edits: overlay live preview env on top of base.
 	// GetSecret returns empty map (not error) when missing = first deploy.
 	liveEnvStr, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{
 		Namespace: previewNamespace,
 		Name:      previewName,
 	})
-	existingEnv := util.MergePreviewEnv(prodEnvStr, liveEnvStr, previewURL)
+	existingEnv := util.MergePreviewServiceEnv(baseEnvStr, liveEnvStr, previewURL)
 	slog.Info("preview deploy: env inherited", "copy_id", copy.Id, "pr", prNumber, "env_keys", len(existingEnv), "port", copy.Port)
 
 	builtImage, err := app.Github.CloneAndBuildPRWithLogs(ctx, headCloneURL, token, sanitizedRootDir, headRef, headSHA, imageTag, logFn, existingEnv)
@@ -974,13 +974,13 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 		}
 	}
 	copyEnv := func(prodNamespace, prodName, previewNamespace, previewName, hostname string) map[string][]byte {
-		prodEnv, err := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: prodNamespace, Name: prodName})
+		baseEnv, err := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: prodNamespace, Name: prodName})
 		if err != nil {
 			slog.Warn("preview copy: parent env lookup failed, copying without env", "namespace", prodNamespace, "name", prodName, "err", err)
-			prodEnv = map[string]string{}
+			baseEnv = map[string]string{}
 		}
 		liveEnv, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{Namespace: previewNamespace, Name: previewName})
-		return util.MergePreviewEnv(prodEnv, liveEnv, "https://"+hostname)
+		return util.MergePreviewServiceEnv(baseEnv, liveEnv, "https://"+hostname)
 	}
 
 	if services, err := app.Supabase.GetServicesByProjectId(projectId); err != nil {
@@ -1083,16 +1083,16 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 	}
 }
 
-func (app *Application) cleanupPRPreviews(installationId string, repoId int64, repoFullName string, prNumber int, previews []store.PreviewServiceView) {
+func (app *Application) cleanupPRPreviews(installationId string, repoId int64, repoFullName string, prNumber int, previews []store.PreviewEnvironmentView) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	namespaces := map[string]bool{}
 	for _, v := range previews {
-		if strings.TrimSpace(v.Env.Namespace) == "" {
+		if strings.TrimSpace(v.Environment.Namespace) == "" {
 			continue
 		}
-		namespaces[v.Env.Namespace] = true
+		namespaces[v.Environment.Namespace] = true
 	}
 	if len(namespaces) == 0 {
 		namespaces[util.PreviewNamespaceForRepo(repoId, prNumber)] = true
@@ -1107,21 +1107,21 @@ func (app *Application) cleanupPRPreviews(installationId string, repoId int64, r
 	seenEnvs := map[string]bool{}
 	owners := map[string]string{}
 	for _, v := range previews {
-		if v.Env.Id == "" || seenEnvs[v.Env.Id] {
+		if v.Environment.Id == "" || seenEnvs[v.Environment.Id] {
 			continue
 		}
-		seenEnvs[v.Env.Id] = true
-		ownerId, ok := owners[v.Env.ProjectId]
+		seenEnvs[v.Environment.Id] = true
+		ownerId, ok := owners[v.Environment.ProjectId]
 		if !ok {
 			var oerr error
-			ownerId, oerr = app.Supabase.GetProjectOwnerId(v.Env.ProjectId)
+			ownerId, oerr = app.Supabase.GetProjectOwnerId(v.Environment.ProjectId)
 			if oerr != nil {
-				slog.Warn("preview cleanup: owner lookup failed, keeping copy rows", "env_id", v.Env.Id, "pr", prNumber, "err", oerr)
+				slog.Warn("preview cleanup: owner lookup failed, keeping copy rows", "env_id", v.Environment.Id, "pr", prNumber, "err", oerr)
 				ownerId = ""
 			}
-			owners[v.Env.ProjectId] = ownerId
+			owners[v.Environment.ProjectId] = ownerId
 		}
-		children, cerr := app.Supabase.GetPreviewEnvironmentServices(v.Env.Id)
+		children, cerr := app.Supabase.GetPreviewEnvironmentServices(v.Environment.Id)
 		if cerr == nil {
 			for _, c := range children {
 				_ = app.Supabase.DeletePreviewEnvironmentServicesBySource(c.SourceServiceId)
@@ -1132,8 +1132,8 @@ func (app *Application) cleanupPRPreviews(installationId string, repoId int64, r
 				}
 			}
 		}
-		if err := app.Supabase.DeletePreviewEnvironment(v.Env.Id); err != nil {
-			slog.Warn("preview cleanup: env delete failed", "env_id", v.Env.Id, "pr", prNumber, "err", err)
+		if err := app.Supabase.DeletePreviewEnvironment(v.Environment.Id); err != nil {
+			slog.Warn("preview cleanup: env delete failed", "env_id", v.Environment.Id, "pr", prNumber, "err", err)
 		}
 	}
 
@@ -1154,7 +1154,7 @@ func (app *Application) markPreviewTornDown(ctx context.Context, token string, r
 	if commentID == 0 {
 		commentID = app.Github.FindPRCommentByMarker(ctx, token, repoFullName, prNumber, marker)
 		if commentID == 0 {
-			views, _ := app.Supabase.GetPreviewServiceViewsByRepoPR(repoId, prNumber)
+			views, _ := app.Supabase.GetPreviewEnvironmentViewsByRepoPR(repoId, prNumber)
 			if len(views) == 0 {
 				return
 			}

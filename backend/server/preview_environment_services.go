@@ -19,7 +19,7 @@ import (
 	"github.com/timmyjinks/tysoncloud/util"
 )
 
-func toPreviewResponse(src store.PreviewSource, env store.PreviewEnvironment, child store.PreviewEnvironmentService, hostname string, liveEnv map[string]string, status string) PreviewEnvironmentResponse {
+func toPreviewEnvironmentServiceResponse(src store.PreviewEnvironmentSource, env store.PreviewEnvironment, child store.PreviewEnvironmentService, hostname string, liveEnv map[string]string, status string) PreviewEnvironmentServiceResponse {
 	previewURL := ""
 	if hostname != "" {
 		previewURL = "https://" + hostname
@@ -31,8 +31,8 @@ func toPreviewResponse(src store.PreviewSource, env store.PreviewEnvironment, ch
 	if src.RepoName != "" {
 		prURL = "https://github.com/" + src.RepoName + "/pull/" + strconv.Itoa(env.Pr)
 	}
-	return PreviewEnvironmentResponse{
-		Id:              strconv.FormatInt(child.Id, 10),
+	return PreviewEnvironmentServiceResponse{
+		Id:              child.Id,
 		PreviewEnvId:    env.Id,
 		EnvName:         env.Name,
 		SourceType:      child.SourceType,
@@ -54,7 +54,7 @@ func toPreviewResponse(src store.PreviewSource, env store.PreviewEnvironment, ch
 	}
 }
 
-func (app *Application) resolvePreviewEnv(ctx context.Context, env store.PreviewEnvironment, src store.PreviewSource, hostname string) (map[string]string, error) {
+func (app *Application) resolvePreviewEnvironmentServiceEnv(ctx context.Context, env store.PreviewEnvironment, src store.PreviewEnvironmentSource, hostname string) (map[string]string, error) {
 	previewName := util.PreviewResourceName(src.ResourceName, env.Pr)
 	if live, err := app.Deploy.GetServiceEnv(ctx, deploy.Service{
 		Namespace: env.Namespace,
@@ -108,13 +108,13 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 		writeError(w, http.StatusNotFound, "We couldn't find that project.", err)
 		return
 	}
-	env, ok := app.visiblePreviewEnv(projectId, envId)
+	env, ok := app.visiblePreviewEnvironment(projectId, envId)
 	if !ok {
 		writeError(w, http.StatusNotFound, "We couldn't find that preview environment.", nil)
 		return
 	}
 
-	var req PreviewServiceUpdateRequest
+	var req PreviewEnvironmentServiceUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "That preview request wasn't valid.", err)
 		return
@@ -150,7 +150,7 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 		writeError(w, http.StatusNotFound, "We couldn't find that service in this preview environment.", nil)
 		return
 	}
-	src, err := app.Supabase.GetPreviewSource(child.SourceType, child.SourceServiceId)
+	src, err := app.Supabase.GetPreviewEnvironmentSource(child.SourceType, child.SourceServiceId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "We couldn't find that service in this preview environment.", err)
 		return
@@ -171,7 +171,7 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 		Name:      secretName,
 	})
 	if err != nil {
-		current, err = app.resolvePreviewEnv(ctx, env, src, hostname)
+		current, err = app.resolvePreviewEnvironmentServiceEnv(ctx, env, src, hostname)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "Couldn't load the preview's current configuration.", err)
 			return
@@ -260,7 +260,7 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(toPreviewResponse(src, env, *child, hostname, current, src.Status)); err != nil {
+	if err := json.NewEncoder(w).Encode(toPreviewEnvironmentServiceResponse(src, env, *child, hostname, current, src.Status)); err != nil {
 		writeError(w, http.StatusInternalServerError, msgServerError, err)
 	}
 }
@@ -269,7 +269,7 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 // preview copy from stored fields: the prod service's resource name plus the
 // live PR head SHA. Empty string when it can't be resolved; callers fall back
 // to the :latest tag.
-func (app *Application) previewGithubImage(ctx context.Context, userId string, src store.PreviewSource, env store.PreviewEnvironment) string {
+func (app *Application) previewGithubImage(ctx context.Context, userId string, src store.PreviewEnvironmentSource, env store.PreviewEnvironment) string {
 	baseName := strings.TrimSuffix(src.Name, fmt.Sprintf("-pr-%d", env.Pr))
 	prods, err := app.Supabase.GetProductionGithubServices(src.ProjectId, userId)
 	if err != nil {
@@ -321,7 +321,7 @@ func (app *Application) DeletePreviewEnvironmentService(w http.ResponseWriter, r
 		writeError(w, http.StatusNotFound, "We couldn't find that project.", err)
 		return
 	}
-	env, ok := app.visiblePreviewEnv(projectId, envId)
+	env, ok := app.visiblePreviewEnvironment(projectId, envId)
 	if !ok {
 		writeError(w, http.StatusNotFound, "We couldn't find that preview environment.", nil)
 		return
@@ -343,7 +343,7 @@ func (app *Application) DeletePreviewEnvironmentService(w http.ResponseWriter, r
 		writeError(w, http.StatusNotFound, "We couldn't find that service in this preview environment.", nil)
 		return
 	}
-	src, err := app.Supabase.GetPreviewSource(child.SourceType, child.SourceServiceId)
+	src, err := app.Supabase.GetPreviewEnvironmentSource(child.SourceType, child.SourceServiceId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "We couldn't find that service in this preview environment.", err)
 		return
@@ -416,7 +416,7 @@ func (app *Application) GetPreviewEnvironmentServiceLogs(w http.ResponseWriter, 
 		writeError(w, http.StatusNotFound, "We couldn't find that project.", err)
 		return
 	}
-	env, ok := app.visiblePreviewEnv(projectId, envId)
+	env, ok := app.visiblePreviewEnvironment(projectId, envId)
 	if !ok {
 		writeError(w, http.StatusNotFound, "We couldn't find that preview environment.", nil)
 		return
@@ -442,7 +442,7 @@ func (app *Application) GetPreviewEnvironmentServiceLogs(w http.ResponseWriter, 
 		writeError(w, http.StatusBadRequest, "Databases don't have log streams.", nil)
 		return
 	}
-	src, err := app.Supabase.GetPreviewSource(child.SourceType, child.SourceServiceId)
+	src, err := app.Supabase.GetPreviewEnvironmentSource(child.SourceType, child.SourceServiceId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "We couldn't find that service in this preview environment.", err)
 		return

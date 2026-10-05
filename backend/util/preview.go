@@ -25,12 +25,12 @@ func PreviewSecretName(sourceType, previewName string) string {
 	return previewName
 }
 
-// MergePreviewEnv preserves preview edits across redeploys: start from prod,
+// MergePreviewServiceEnv preserves preview edits across redeploys: start from base,
 // overlay live preview keys, force preview URL. First deploy (live empty)
-// is just prod + preview URL.
-func MergePreviewEnv(prod, live map[string]string, previewURL string) map[string][]byte {
+// is just base + preview URL.
+func MergePreviewServiceEnv(base, live map[string]string, previewURL string) map[string][]byte {
 	merged := map[string][]byte{}
-	for k, v := range prod {
+	for k, v := range base {
 		merged[k] = []byte(v)
 	}
 	for k, v := range live {

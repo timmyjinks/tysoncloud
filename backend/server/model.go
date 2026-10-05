@@ -135,7 +135,7 @@ type GithubServiceDeleteRequest struct {
 	Id string `json:"id"`
 }
 
-type PreviewEnvironmentResponse struct {
+type PreviewEnvironmentServiceResponse struct {
 	Id              string            `json:"id"`
 	PreviewEnvId    string            `json:"preview_env_id"`
 	EnvName         string            `json:"env_name"`
@@ -157,7 +157,7 @@ type PreviewEnvironmentResponse struct {
 	CreatedAt       time.Time         `json:"created_at"`
 }
 
-type PreviewEnvSummary struct {
+type PreviewEnvironmentResponse struct {
 	Id        string    `json:"id"`
 	ProjectId string    `json:"project_id"`
 	Name      string    `json:"name"`
@@ -166,17 +166,17 @@ type PreviewEnvSummary struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-type PreviewEnvListItem struct {
-	Id        string                       `json:"id"`
-	ProjectId string                       `json:"project_id"`
-	Name      string                       `json:"name"`
-	Pr        int                          `json:"pr"`
-	Namespace string                       `json:"namespace"`
-	Services  []PreviewEnvironmentResponse `json:"services"`
-	CreatedAt time.Time                    `json:"created_at"`
+type PreviewEnvironmentServicesResponse struct {
+	Id        string                              `json:"id"`
+	ProjectId string                              `json:"project_id"`
+	Name      string                              `json:"name"`
+	Pr        int                                 `json:"pr"`
+	Namespace string                              `json:"namespace"`
+	Services  []PreviewEnvironmentServiceResponse `json:"services"`
+	CreatedAt time.Time                           `json:"created_at"`
 }
 
-type PreviewServiceUpdateRequest struct {
+type PreviewEnvironmentServiceUpdateRequest struct {
 	Env  *string `json:"env,omitempty"`
 	Port *int32  `json:"port,omitempty"`
 }

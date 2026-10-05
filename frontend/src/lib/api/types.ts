@@ -153,7 +153,7 @@ export type GithubReposResponse = {
   repositories: GithubRepo[];
 };
 
-export type PreviewEnvironment = {
+export type PreviewEnvironmentService = {
   id: string;
   preview_env_id: string;
   env_name: string;
@@ -175,7 +175,7 @@ export type PreviewEnvironment = {
   created_at: string;
 };
 
-export type PreviewEnvSummary = {
+export type PreviewEnvironment = {
   id: string;
   project_id: string;
   name: string;
@@ -184,17 +184,17 @@ export type PreviewEnvSummary = {
   created_at: string;
 };
 
-export type PreviewServiceUpdateRequest = {
+export type PreviewEnvironmentServiceUpdateRequest = {
   env?: string;
   port?: number;
 };
 
-export type PreviewEnvListItem = {
+export type PreviewEnvironmentServices = {
   id: string;
   project_id: string;
   name: string;
   pr: number;
   namespace: string;
-  services: PreviewEnvironment[];
+  services: PreviewEnvironmentService[];
   created_at: string;
 };

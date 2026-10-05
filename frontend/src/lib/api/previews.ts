@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
   PreviewEnvironment,
-  PreviewEnvListItem,
-  PreviewEnvSummary,
-  PreviewServiceUpdateRequest,
+  PreviewEnvironmentService,
+  PreviewEnvironmentServices,
+  PreviewEnvironmentServiceUpdateRequest,
 } from "./types";
 
 export const previewKeys = {
@@ -16,7 +16,7 @@ export const previewKeys = {
 export function useProjectPreviewEnvironments(projectId: string) {
   return useQuery({
     queryKey: previewKeys.byProject(projectId),
-    queryFn: () => api.get<PreviewEnvSummary[]>(`/projects/${projectId}/preview_environments`),
+    queryFn: () => api.get<PreviewEnvironment[]>(`/projects/${projectId}/preview_environments`),
     enabled: !!projectId,
   });
 }
@@ -25,7 +25,7 @@ export function useProjectPreviewEnvironment(projectId: string, envId: string | 
   return useQuery({
     queryKey: previewKeys.detail(projectId, envId ?? ""),
     queryFn: () =>
-      api.get<PreviewEnvListItem>(`/projects/${projectId}/preview_environments/${envId}`),
+      api.get<PreviewEnvironmentServices>(`/projects/${projectId}/preview_environments/${envId}`),
     enabled: !!projectId && !!envId,
   });
 }
@@ -33,8 +33,8 @@ export function useProjectPreviewEnvironment(projectId: string, envId: string | 
 export function useUpdatePreviewService(projectId: string, envId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ sourceId, body }: { sourceId: string; body: PreviewServiceUpdateRequest }) =>
-      api.put<PreviewEnvironment>(
+    mutationFn: ({ sourceId, body }: { sourceId: string; body: PreviewEnvironmentServiceUpdateRequest }) =>
+      api.put<PreviewEnvironmentService>(
         `/projects/${projectId}/preview_environments/${envId}/services/${sourceId}`,
         body,
       ),

@@ -2,7 +2,7 @@ package store
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/supabase-community/postgrest-go"
@@ -62,7 +62,7 @@ func (s *SupabaseStore) CreateProject(userId, name string) (ProjectsTable, error
 	}
 
 	if len(res) == 0 {
-		return ProjectsTable{}, errors.New("the project wasn't created")
+		return ProjectsTable{}, fmt.Errorf("the project wasn't created")
 	}
 
 	return res[0], nil
@@ -83,6 +83,27 @@ func (s *SupabaseStore) UpdateProject(id, userId, name string) error {
 	}
 
 	return nil
+}
+
+func (s *SupabaseStore) GetProjectOwnerId(projectId string) (string, error) {
+	res, _, err := s.cli.From("projects").
+		Select("user_id", "exact", false).
+		Eq("id", projectId).
+		Single().
+		Execute()
+	if err != nil {
+		return "", err
+	}
+	var out struct {
+		UserId string `json:"user_id"`
+	}
+	if err := json.Unmarshal(res, &out); err != nil {
+		return "", err
+	}
+	if out.UserId == "" {
+		return "", fmt.Errorf("project %s has no owner", projectId)
+	}
+	return out.UserId, nil
 }
 
 func (s *SupabaseStore) DeleteProject(userId, id string) error {

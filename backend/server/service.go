@@ -76,7 +76,7 @@ func (app *Application) GetServices(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	services, err := app.Supabase.GetServices(projectId, claims.Subject)
+	services, err := app.Supabase.GetProductionServices(projectId, claims.Subject)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's services.", err)
 		return

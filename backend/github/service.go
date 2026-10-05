@@ -15,6 +15,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -170,10 +172,92 @@ func (s *Service) VerifyWebhookSignature(signature string, body []byte) bool {
 }
 
 func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, rootDir, branch, imageTag string) (string, error) {
-	return s.CloneAndBuildWithLogs(ctx, cloneURL, accessToken, rootDir, branch, imageTag, nil)
+	return s.CloneAndBuildWithLogs(ctx, cloneURL, accessToken, rootDir, branch, imageTag, nil, nil)
 }
 
-func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessToken, rootDir, branch, imageTag string, logFn func(string)) (string, error) {
+var envKeyRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func railpackEnvArgs(env map[string][]byte) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		if envKeyRegex.MatchString(k) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	args := make([]string, 0, len(keys)*2)
+	for _, k := range keys {
+		args = append(args, "--env", k+"="+string(env[k]))
+	}
+	return args
+}
+
+func railpackEnvKeys(env map[string][]byte) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		if envKeyRegex.MatchString(k) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func buildctlSecretArgs(env map[string][]byte) []string {
+	keys := railpackEnvKeys(env)
+	if len(keys) == 0 {
+		return nil
+	}
+	args := make([]string, 0, len(keys)*2)
+	for _, k := range keys {
+		args = append(args, "--secret", "id="+k+",env="+k)
+	}
+	return args
+}
+
+func secretsHash(env map[string][]byte) string {
+	keys := railpackEnvKeys(env)
+	if len(keys) == 0 {
+		return ""
+	}
+	h := sha256.New()
+	for _, k := range keys {
+		h.Write([]byte(k + "=" + string(env[k]) + "\n"))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func exportEnv(base []string, env map[string][]byte) []string {
+	keys := railpackEnvKeys(env)
+	if len(keys) == 0 {
+		return base
+	}
+	replace := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		replace[k+"="] = true
+	}
+	out := make([]string, 0, len(base)+len(keys))
+	for _, kv := range base {
+		if i := strings.IndexByte(kv, '='); i > 0 {
+			if replace[kv[:i+1]] {
+				continue
+			}
+		}
+		out = append(out, kv)
+	}
+	for _, k := range keys {
+		out = append(out, k+"="+string(env[k]))
+	}
+	return out
+}
+
+func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessToken, rootDir, branch, imageTag string, logFn func(string), env map[string][]byte) (string, error) {
 	emit := func(msg string) {
 		slog.Info(msg)
 		if logFn != nil {
@@ -208,12 +292,170 @@ func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessTok
 	}
 
 	emit(fmt.Sprintf("[state] building: railpack prepare context=%s", buildCtx))
-	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn)
+	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env)
 	if err != nil {
 		return "", err
 	}
 	emit(fmt.Sprintf("[state] building: image built %s", image))
 	return image, nil
+}
+
+func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessToken, rootDir, headRef, headSHA, imageTag string, logFn func(string), env map[string][]byte) (string, error) {
+	emit := func(msg string) {
+		slog.Info(msg)
+		if logFn != nil {
+			logFn(msg)
+		}
+	}
+	emitErr := func(msg string, err error, output string) {
+		slog.Error(msg, "err", err, "output", output)
+		if logFn != nil {
+			if output != "" {
+				for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
+					logFn(line)
+				}
+			}
+			logFn(fmt.Sprintf("%s: %v", msg, err))
+		}
+	}
+
+	emit(fmt.Sprintf("[state] building: cloning PR head %s ref=%s sha=%s root_dir=%s", cloneURL, headRef, headSHA, rootDir))
+	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, headRef, logFn)
+	if err != nil {
+		emitErr("git clone failed", err, "")
+		return "", err
+	}
+	defer os.RemoveAll(cloneDir)
+	emit("[state] building: cloning succeeded")
+
+	if strings.TrimSpace(headSHA) != "" {
+		fetch := exec.CommandContext(ctx, "git", "-C", cloneDir, "fetch", "origin", strings.TrimSpace(headSHA), "--depth", "1")
+		fetch.Env = os.Environ()
+		if out, ferr := runCmdWithLogs(fetch, logFn); ferr != nil {
+			slog.Warn("git fetch sha failed, trying checkout", "sha", headSHA, "err", ferr, "output", out)
+		}
+		checkedOut := false
+		for _, args := range [][]string{
+			{"-C", cloneDir, "checkout", strings.TrimSpace(headSHA)},
+			{"-C", cloneDir, "checkout", "FETCH_HEAD"},
+		} {
+			cmd := exec.CommandContext(ctx, "git", args...)
+			cmd.Env = os.Environ()
+			if _, cerr := runCmdWithLogs(cmd, logFn); cerr == nil {
+				checkedOut = true
+				break
+			}
+		}
+		if !checkedOut {
+			slog.Warn("git checkout sha failed, using branch tip", "sha", headSHA)
+		}
+	}
+
+	buildCtx, err := resolveBuildContext(cloneDir, rootDir)
+	if err != nil {
+		emitErr("resolve build context failed", err, "")
+		return "", err
+	}
+
+	emit(fmt.Sprintf("[state] building: railpack prepare context=%s", buildCtx))
+	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env)
+	if err != nil {
+		return "", err
+	}
+	emit(fmt.Sprintf("[state] building: image built %s", image))
+	return image, nil
+}
+
+func (s *Service) PostPRComment(ctx context.Context, installationToken, repoFullName string, prNumber int, body string) (int64, error) {
+	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || prNumber <= 0 {
+		return 0, fmt.Errorf("installation token, repo and PR number are required")
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments", strings.TrimSpace(repoFullName), prNumber)
+	payload, _ := json.Marshal(map[string]string{"body": body})
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(payload))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Authorization", "Bearer "+installationToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusCreated {
+		return 0, fmt.Errorf("github comment failed %d: %s", resp.StatusCode, string(respBody))
+	}
+	var out struct {
+		Id int64 `json:"id"`
+	}
+	_ = json.Unmarshal(respBody, &out)
+	return out.Id, nil
+}
+
+func (s *Service) UpdatePRComment(ctx context.Context, installationToken, repoFullName string, commentID int64, body string) error {
+	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || commentID <= 0 {
+		return fmt.Errorf("installation token, repo and comment id are required")
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/comments/%d", strings.TrimSpace(repoFullName), commentID)
+	payload, _ := json.Marshal(map[string]string{"body": body})
+	req, err := http.NewRequestWithContext(ctx, "PATCH", url, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+installationToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("github comment update failed %d: %s", resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
+func (s *Service) FindPRCommentByMarker(ctx context.Context, installationToken, repoFullName string, prNumber int, marker string) int64 {
+	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || prNumber <= 0 || marker == "" {
+		return 0
+	}
+	url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%d/comments?per_page=100", strings.TrimSpace(repoFullName), prNumber)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return 0
+	}
+	req.Header.Set("Authorization", "Bearer "+installationToken)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return 0
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return 0
+	}
+	var comments []struct {
+		Id   int64  `json:"id"`
+		Body string `json:"body"`
+	}
+	if err := json.Unmarshal(body, &comments); err != nil {
+		return 0
+	}
+	for _, c := range comments {
+		if strings.Contains(c.Body, marker) {
+			return c.Id
+		}
+	}
+	return 0
 }
 
 func resolveBuildContext(cloneDir, rootDir string) (string, error) {
@@ -268,10 +510,10 @@ func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken, branch string
 }
 
 func buildImageWithRailpack(ctx context.Context, buildContext, imageTag string) (string, error) {
-	return buildImageWithRailpackWithLogs(ctx, buildContext, imageTag, nil)
+	return buildImageWithRailpackWithLogs(ctx, buildContext, imageTag, nil, nil)
 }
 
-func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag string, logFn func(string)) (string, error) {
+func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag string, logFn func(string), env map[string][]byte) (string, error) {
 	if buildContext == "" {
 		return "", fmt.Errorf("build context is empty")
 	}
@@ -286,21 +528,47 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 	defer os.RemoveAll(planDir)
 	planPath := filepath.Join(planDir, "railpack-plan.json")
 
-	prepCmd := exec.CommandContext(ctx, "railpack", "prepare", buildContext, "--plan-out", planPath)
+	envArgs := railpackEnvArgs(env)
+	if keys := railpackEnvKeys(env); len(keys) > 0 {
+		msg := fmt.Sprintf("[state] building: railpack env_keys=%d [%s]", len(keys), strings.Join(keys, ","))
+		slog.Info(msg)
+		if logFn != nil {
+			logFn(msg)
+		}
+	}
+	prepArgs := append([]string{"prepare", buildContext, "--plan-out", planPath}, envArgs...)
+	prepCmd := exec.CommandContext(ctx, "railpack", prepArgs...)
 	prepCmd.Env = os.Environ()
 	if out, err := runCmdWithLogs(prepCmd, logFn); err != nil {
 		slog.Error("railpack prepare failed", "err", err, "output", out)
 		return "", fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
-	buildCmd := exec.CommandContext(ctx, "buildctl", "build",
-		"--local", "context="+buildContext,
-		"--local", "dockerfile="+planDir,
+	buildArgs := []string{
+		"build",
+		"--local", "context=" + buildContext,
+		"--local", "dockerfile=" + planDir,
 		"--frontend=gateway.v0",
 		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest",
+	}
+	if secretArgs := buildctlSecretArgs(env); len(secretArgs) > 0 {
+		buildArgs = append(buildArgs, secretArgs...)
+	}
+	if hash := secretsHash(env); hash != "" {
+		buildArgs = append(buildArgs, "--opt", "build-arg:secrets-hash="+hash)
+	}
+	buildArgs = append(buildArgs,
 		"--output", fmt.Sprintf("type=image,name=%s,push=true,registry.insecure=true", imageTag),
 	)
-	buildCmd.Env = os.Environ()
+	buildCmd := exec.CommandContext(ctx, "buildctl", buildArgs...)
+	buildCmd.Env = exportEnv(os.Environ(), env)
+	if keys := railpackEnvKeys(env); len(keys) > 0 {
+		msg := fmt.Sprintf("[state] building: buildctl secret_ids=%d [%s]", len(keys), strings.Join(keys, ","))
+		slog.Info(msg)
+		if logFn != nil {
+			logFn(msg)
+		}
+	}
 	if out, err := runCmdWithLogs(buildCmd, logFn); err != nil {
 		slog.Error("buildctl build failed", "err", err, "output", out)
 		return "", fmt.Errorf("buildctl build failed: %w", err)

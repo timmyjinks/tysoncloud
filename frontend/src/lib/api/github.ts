@@ -75,11 +75,11 @@ export function useGithubServices(projectId: string) {
   });
 }
 
-export function useGithubService(id: string) {
+export function useGithubService(id: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: githubKeys.detail(id),
     queryFn: () => api.get<GithubService>(`/github_services/${id}`),
-    enabled: !!id,
+    enabled: !!id && (opts?.enabled ?? true),
   });
 }
 

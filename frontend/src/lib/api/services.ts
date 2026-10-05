@@ -15,11 +15,11 @@ export function useServices(projectId: string) {
   });
 }
 
-export function useService(id: string) {
+export function useService(id: string, opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: serviceKeys.detail(id),
     queryFn: () => api.get<Service>(`/services/${id}`),
-    enabled: !!id,
+    enabled: !!id && (opts?.enabled ?? true),
   });
 }
 

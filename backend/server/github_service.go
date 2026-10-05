@@ -152,7 +152,7 @@ func (app *Application) GetGithubServices(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	services, err := app.Supabase.GetGithubServices(projectId, claims.Subject)
+	services, err := app.Supabase.GetProductionGithubServices(projectId, claims.Subject)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's services.", err)
 		return
@@ -310,7 +310,7 @@ func (app *Application) CreateGithubService(w http.ResponseWriter, r *http.Reque
 		registryURL := app.Github.RegistryURL()
 		imageTag := app.Github.RegistryTag(registryURL, res.ResourceName, "latest")
 
-		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, sanitizedBranch, imageTag, logFn)
+		image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, sanitizedBranch, imageTag, logFn, util.ParseEnv(req.Env))
 		if err != nil {
 			slog.Error("failed to build github service image", "service_id", res.Id, "root_dir", sanitizedRootDir, "branch", sanitizedBranch, "err", err)
 			logFn(`[state] building failed: ` + err.Error())
@@ -568,7 +568,22 @@ func (app *Application) buildGithubServiceFromGit(userId string, svc store.Githu
 	registryURL := app.Github.RegistryURL()
 	imageTag := app.Github.RegistryTag(registryURL, svc.ResourceName, "latest")
 
-	image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, branch, imageTag, logFn)
+	// Resolve the effective env BEFORE the build so the image bakes the same
+	// vars it runs with. Ephemeral — never stored beyond the K8s secret.
+	buildEnv := util.ParseEnv(envStr)
+	if strings.TrimSpace(envStr) == "" {
+		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{
+			Namespace: "proj-" + svc.ProjectId,
+			Name:      svc.ResourceName,
+		}); envErr == nil && len(existingEnv) > 0 {
+			buildEnv = map[string][]byte{}
+			for k, v := range existingEnv {
+				buildEnv[k] = []byte(v)
+			}
+		}
+	}
+
+	image, err := app.Github.CloneAndBuildWithLogs(buildCtx, cloneURL, accessToken, sanitizedRootDir, branch, imageTag, logFn, buildEnv)
 	if err != nil {
 		slog.Error("failed to build github service image", "service_id", svc.Id, "branch", branch, "root_dir", sanitizedRootDir, "err", err)
 		logFn(`[state] building failed: ` + err.Error())
@@ -584,18 +599,7 @@ func (app *Application) buildGithubServiceFromGit(userId string, svc store.Githu
 		slog.Warn("failed to mark github service deploying", "service_id", svc.Id, "err", statusErr)
 	}
 
-	env := util.ParseEnv(envStr)
-	if reqEnvEmpty := strings.TrimSpace(envStr) == ""; reqEnvEmpty {
-		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{
-			Namespace: "proj-" + svc.ProjectId,
-			Name:      svc.ResourceName,
-		}); envErr == nil && len(existingEnv) > 0 {
-			env = map[string][]byte{}
-			for k, v := range existingEnv {
-				env[k] = []byte(v)
-			}
-		}
-	}
+	env := buildEnv
 
 	if err := app.Deploy.CreateService(buildCtx, deploy.Service{
 		Namespace: "proj-" + svc.ProjectId,
@@ -701,14 +705,16 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	svcBefore, _ := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
+
 	if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
 		return
 	}
 
 	resourceName := "svc-" + githubServiceId
-	if svc, err := app.Supabase.GetGithubServiceById(githubServiceId); err == nil && svc.ResourceName != "" {
-		resourceName = svc.ResourceName
+	if svcBefore.ResourceName != "" {
+		resourceName = svcBefore.ResourceName
 	}
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 		Namespace: "proj-" + projectId,
@@ -747,13 +753,14 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, id := range req.Ids {
+		svcBefore, _ := app.Supabase.GetGithubService(id, claims.Subject)
 		if err := app.Supabase.DeleteGithubService(id, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: id, Error: "Couldn't delete the service."})
 			continue
 		}
 		resourceName := "svc-" + id
-		if svc, err := app.Supabase.GetGithubServiceById(id); err == nil && svc.ResourceName != "" {
-			resourceName = svc.ResourceName
+		if svcBefore.ResourceName != "" {
+			resourceName = svcBefore.ResourceName
 		}
 		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 			Namespace: "proj-" + projectId,
@@ -821,10 +828,11 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	status := strings.ToLower(strings.TrimSpace(svc.Status))
 	isPreDeploy := status == "pending" || status == "building" || status == "deploying" || status == ""
+	buildLogID := svc.Id
 	if isPreDeploy {
 		lines := make(chan string, 64)
-		subID, ch, snap := app.Github.SubscribeBuildLogs(svc.Id)
-		defer app.Github.UnsubscribeBuildLogs(svc.Id, subID)
+		subID, ch, snap := app.Github.SubscribeBuildLogs(buildLogID)
+		defer app.Github.UnsubscribeBuildLogs(buildLogID, subID)
 		stateLine := `[state] ` + svc.Status + ` repo=` + svc.RepoName + ` branch=` + svc.Branch + ` root_dir=` + svc.RootDir + ` domain=` + svc.PublicDomain + ` port=` + strconv.FormatInt(int64(svc.Port), 10)
 		go func() {
 			defer close(lines)

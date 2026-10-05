@@ -88,6 +88,7 @@ function EditServicePage() {
               navigate({
                 to: "/projects/$projectId/services/$serviceId",
                 params: { projectId, serviceId },
+                search: { env: undefined },
               }),
           },
         );

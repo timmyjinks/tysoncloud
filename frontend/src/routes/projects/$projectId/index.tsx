@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ChevronDown,
@@ -18,7 +18,12 @@ import {
   useDeleteGithubServices,
   useGithubServices,
 } from "@/lib/api/github";
-import { getErrorMessage } from "@/lib/api/client";
+import {
+  useDeletePreviewService,
+  useProjectPreviewEnvironment,
+  useProjectPreviewEnvironments,
+} from "@/lib/api/previews";
+import { ApiRequestError, getErrorMessage } from "@/lib/api/client";
 import { ResourceRow } from "@/components/resource-row";
 import { ResourceStatusBar } from "@/components/resource-status-bar";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
@@ -27,6 +32,12 @@ import { ErrorBanner } from "@/components/error-banner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import {
+  PreviewServiceEditDialog,
+  type PreviewEditTarget,
+} from "@/components/preview-service-edit-dialog";
 import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Service, Database, GithubService } from "@/lib/api/types";
@@ -75,6 +86,39 @@ function ProjectDetail() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pendingBulk, setPendingBulk] = useState<Resource[] | null>(null);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  // Environment scope: production is the live resource list below; any other
+  // value is a preview env id whose service copies replace it.
+  const [selectedEnv, setSelectedEnv] = useState("production");
+  const [editingPreview, setEditingPreview] = useState<PreviewEditTarget>(null);
+  const [pendingPreview, setPendingPreview] = useState<{
+    id: string;
+    name: string;
+    kind: "service" | "database" | "github_service";
+  } | null>(null);
+  const {
+    data: previewEnvs,
+    error: previewEnvsError,
+    refetch: refetchPreviewEnvs,
+  } = useProjectPreviewEnvironments(projectId);
+  const previewDetail = useProjectPreviewEnvironment(
+    projectId,
+    selectedEnv === "production" ? null : selectedEnv,
+  );
+  useEffect(() => {
+    if (
+      selectedEnv !== "production" &&
+      previewDetail.error instanceof ApiRequestError &&
+      previewDetail.error.status === 404
+    ) {
+      setSelectedEnv("production");
+    }
+  }, [previewDetail.error, selectedEnv]);
+  const selectedPreviewEnv = previewDetail.data ?? null;
+  const isPreviewMode = selectedEnv !== "production";
+  const deletePreview = useDeletePreviewService(
+    projectId,
+    isPreviewMode ? selectedEnv : "",
+  );
 
   const isLoading = servicesLoading || databasesLoading || githubServicesLoading;
 
@@ -208,9 +252,9 @@ function ProjectDetail() {
         </Link>
       </PageHeader>
 
-      <div className="mt-10 mb-4 flex items-center justify-between">
+      <div className="mt-10 mb-4 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
-          {resources.length > 0 && (
+          {!isPreviewMode && resources.length > 0 && (
             <Checkbox
               aria-label={allSelected ? "Deselect all resources" : "Select all resources"}
               checked={allSelected}
@@ -218,56 +262,121 @@ function ProjectDetail() {
             />
           )}
           <h2 className="text-lg font-medium text-[var(--color-text-muted)]">
-            Resources{" "}
-            <span className="text-[var(--color-text-faint)]">· {resources.length} total</span>
+            {isPreviewMode ? (
+              <>
+                {selectedPreviewEnv?.name ?? "Preview"}{" "}
+                {selectedPreviewEnv && (
+                  <span className="text-[var(--color-text-faint)]">
+                    · {selectedPreviewEnv.services.length} preview service
+                    {selectedPreviewEnv.services.length === 1 ? "" : "s"}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                Resources{" "}
+                <span className="text-[var(--color-text-faint)]">· {resources.length} total</span>
+              </>
+            )}
           </h2>
         </div>
-        <DropdownMenu
-          trigger={
-            <Button size="sm">
-              <Plus className="h-4 w-4" />
-              New
-              <ChevronDown className="h-4 w-4 opacity-60" />
-            </Button>
-          }
-        >
-          <DropdownMenuItem
-            onClick={() =>
-              navigate({
-                to: "/projects/$projectId/services/new",
-                params: { projectId },
-              })
-            }
-          >
-            <Server className="h-4 w-4" />
-            Service
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
-              navigate({
-                to: "/projects/$projectId/github_services/new",
-                params: { projectId },
-              })
-            }
-          >
-            <Github className="h-4 w-4" />
-            GitHub Service
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() =>
-              navigate({
-                to: "/projects/$projectId/databases/new",
-                params: { projectId },
-              })
-            }
-          >
-            <DatabaseIcon className="h-4 w-4" />
-            Database
-          </DropdownMenuItem>
-        </DropdownMenu>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="w-64">
+            <Label htmlFor="environment">Environment</Label>
+            <Select
+              id="environment"
+              value={selectedEnv}
+              onChange={(e) => setSelectedEnv(e.target.value)}
+              className="mt-2"
+            >
+              <option value="production">Production</option>
+              {(previewEnvs ?? []).map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+          {!isPreviewMode && (
+            <DropdownMenu
+              trigger={
+                <Button size="sm">
+                  <Plus className="h-4 w-4" />
+                  New
+                  <ChevronDown className="h-4 w-4 opacity-60" />
+                </Button>
+              }
+            >
+              <DropdownMenuItem
+                onClick={() =>
+                  navigate({
+                    to: "/projects/$projectId/services/new",
+                    params: { projectId },
+                  })
+                }
+              >
+                <Server className="h-4 w-4" />
+                Service
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  navigate({
+                    to: "/projects/$projectId/github_services/new",
+                    params: { projectId },
+                  })
+                }
+              >
+                <Github className="h-4 w-4" />
+                GitHub Service
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() =>
+                  navigate({
+                    to: "/projects/$projectId/databases/new",
+                    params: { projectId },
+                  })
+                }
+              >
+                <DatabaseIcon className="h-4 w-4" />
+                Database
+              </DropdownMenuItem>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
-      {selectedIds.size > 0 && (
+      {isPreviewMode && selectedPreviewEnv && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md bg-[var(--color-surface-2)] px-5 py-3 text-sm text-[var(--color-text-muted)]">
+          <span>
+            Ephemeral preview — managed by the pull request. Env and port edits apply
+            here only and reset on the next sync.
+          </span>
+          {selectedPreviewEnv.services[0]?.pr_url && (
+            <a
+              href={selectedPreviewEnv.services[0].pr_url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]"
+            >
+              #{selectedPreviewEnv.pr} ↗
+            </a>
+          )}
+          <span className="font-mono text-[var(--color-text-faint)]">
+            {selectedPreviewEnv.namespace}
+          </span>
+        </div>
+      )}
+
+      {previewEnvsError && (
+        <ErrorBanner
+          className="mb-4"
+          message={getErrorMessage(previewEnvsError)}
+          onRetry={() => refetchPreviewEnvs()}
+          retryLabel="Retry"
+        />
+      )}
+
+      {!isPreviewMode && selectedIds.size > 0 && (
         <div className="mb-4 flex items-center justify-between gap-4 rounded-md bg-[var(--color-surface-2)] px-5 py-3">
           <span className="font-mono text-sm text-[var(--color-text-muted)]">
             {selectedIds.size} selected
@@ -286,11 +395,11 @@ function ProjectDetail() {
         </div>
       )}
 
-      {isLoading && (
+      {!isPreviewMode && isLoading && (
         <p className="text-base text-[var(--color-text-faint)]">loading resources…</p>
       )}
 
-      {servicesError && (
+      {!isPreviewMode && servicesError && (
         <ErrorBanner
           className="mb-4"
           message={getErrorMessage(servicesError)}
@@ -299,7 +408,7 @@ function ProjectDetail() {
         />
       )}
 
-      {databasesError && (
+      {!isPreviewMode && databasesError && (
         <ErrorBanner
           className="mb-4"
           message={getErrorMessage(databasesError)}
@@ -308,7 +417,7 @@ function ProjectDetail() {
         />
       )}
 
-      {githubServicesError && (
+      {!isPreviewMode && githubServicesError && (
         <ErrorBanner
           className="mb-4"
           message={getErrorMessage(githubServicesError)}
@@ -317,13 +426,13 @@ function ProjectDetail() {
         />
       )}
 
-      {!isLoading && resources.length === 0 && (
+      {!isPreviewMode && !isLoading && resources.length === 0 && (
         <div className="rounded-lg border border-dashed border-[var(--color-border-strong)] p-16 text-center text-base text-[var(--color-text-muted)]">
           Nothing deployed yet — spin up a service or provision a database to get started.
         </div>
       )}
 
-      {resources.length > 0 && (
+      {!isPreviewMode && resources.length > 0 && (
         <>
           <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
             {resources.map((resource) =>
@@ -414,6 +523,96 @@ function ProjectDetail() {
         </>
       )}
 
+      {isPreviewMode && previewDetail.isLoading && (
+        <p className="text-base text-[var(--color-text-faint)]">loading preview…</p>
+      )}
+
+      {isPreviewMode && previewDetail.error && (
+        <ErrorBanner
+          className="mb-4"
+          message={getErrorMessage(previewDetail.error)}
+          onRetry={() => previewDetail.refetch()}
+          retryLabel="Retry"
+        />
+      )}
+
+      {isPreviewMode && selectedPreviewEnv && (
+        <>
+          {selectedPreviewEnv.services.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-[var(--color-border-strong)] p-16 text-center text-base text-[var(--color-text-muted)]">
+              No preview services tracked in this environment yet.
+            </div>
+          ) : (
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)]">
+              {selectedPreviewEnv.services.map((s) => {
+                const isDb = s.source_type === "database";
+                const isSvc = s.source_type === "service";
+                const icon = isDb ? (
+                  <DatabaseIcon className="h-5 w-5" />
+                ) : isSvc ? (
+                  <Server className="h-5 w-5" />
+                ) : (
+                  <Github className="h-5 w-5" />
+                );
+                // Preview copies are rendered from the preview detail API, not
+                // the prod endpoints. Links carry the env so detail pages
+                // stay in preview mode; deletes go through the preview
+                // endpoint which cleans infra + mapping + empty envs.
+                const detailHref = isDb
+                  ? `/projects/${projectId}/databases/${s.source_service_id}?env=${s.preview_env_id}`
+                  : isSvc
+                    ? `/projects/${projectId}/services/${s.source_service_id}?env=${s.preview_env_id}`
+                    : `/projects/${projectId}/github_services/${s.source_service_id}?env=${s.preview_env_id}`;
+                return (
+                  <ResourceRow
+                    key={`preview-${s.preview_env_id}-${s.source_service_id}`}
+                    icon={icon}
+                    name={s.service_name}
+                    status={s.status || undefined}
+                    runtime={
+                      isDb
+                        ? s.engine || "database"
+                        : isSvc
+                          ? "service"
+                          : s.repo_name
+                    }
+                    subtitle={
+                      isDb
+                        ? "empty copy — no production data"
+                        : isSvc
+                          ? undefined
+                          : `${s.branch} · ${s.repo_name}`
+                    }
+                    size={s.port ? `:${s.port}` : ""}
+                    domain={isDb ? "internal" : s.hostname}
+                    domainHref={!isDb && s.url ? s.url : undefined}
+                    detailHref={detailHref}
+                    onUpdate={
+                      isDb
+                        ? undefined
+                        : () =>
+                            setEditingPreview({
+                              sourceId: s.source_service_id,
+                              serviceName: s.service_name,
+                              env: s.env ?? {},
+                              port: s.port,
+                            })
+                    }
+                    onDelete={() =>
+                      setPendingPreview({
+                        id: s.source_service_id,
+                        name: s.service_name,
+                        kind: isDb ? "database" : isSvc ? "service" : "github_service",
+                      })
+                    }
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
       <DeleteConfirmDialog
         open={!!pendingService}
         onOpenChange={(open) => !open && setPendingService(null)}
@@ -459,6 +658,26 @@ function ProjectDetail() {
         }}
       />
 
+      <DeleteConfirmDialog
+        open={!!pendingPreview}
+        onOpenChange={(open) => !open && setPendingPreview(null)}
+        resourceName={pendingPreview?.name ?? ""}
+        resourceLabel={
+          pendingPreview?.kind === "database" ? "database" : "preview service"
+        }
+        pending={deletePreview.isPending}
+        error={deletePreview.error ? getErrorMessage(deletePreview.error) : undefined}
+        onConfirm={() => {
+          if (!pendingPreview) return;
+          const done = () => {
+            setPendingPreview(null);
+            previewDetail.refetch();
+            refetchPreviewEnvs();
+          };
+          deletePreview.mutate(pendingPreview.id, { onSuccess: done });
+        }}
+      />
+
       <BulkDeleteConfirmDialog
         open={!!pendingBulk}
         onOpenChange={(open) => !open && setPendingBulk(null)}
@@ -466,6 +685,14 @@ function ProjectDetail() {
         pending={bulkPending}
         error={bulkError}
         onConfirm={onBulkConfirm}
+      />
+
+      <PreviewServiceEditDialog
+        projectId={projectId}
+        envId={selectedEnv}
+        service={editingPreview}
+        onClose={() => setEditingPreview(null)}
+        onSaved={() => previewDetail.refetch()}
       />
     </main>
   );

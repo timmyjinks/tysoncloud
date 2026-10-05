@@ -69,7 +69,7 @@ func (app *Application) GetDatabases(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	databases, err := app.Supabase.GetDatabases(projectId, claims.Subject)
+	databases, err := app.Supabase.GetProductionDatabases(projectId, claims.Subject)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't load the project's databases.", err)
 		return

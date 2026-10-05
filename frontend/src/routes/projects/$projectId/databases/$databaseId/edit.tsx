@@ -60,6 +60,7 @@ function EditDatabasePage() {
               navigate({
                 to: "/projects/$projectId/databases/$databaseId",
                 params: { projectId, databaseId },
+                search: { env: undefined },
               }),
           },
         );

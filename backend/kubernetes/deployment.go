@@ -43,6 +43,19 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 					ContainerPort: &resource.Port,
 				},
 			},
+			// Tenant images are arbitrary, so root and the default
+			// capability set are still allowed (many images chown/setuid at
+			// start), but escalation, raw sockets and device creation are not.
+			SecurityContext: &appcorev1.SecurityContextApplyConfiguration{
+				AllowPrivilegeEscalation: util.BoolPtr(false),
+				Privileged:               util.BoolPtr(false),
+				Capabilities: &appcorev1.CapabilitiesApplyConfiguration{
+					Drop: []corev1.Capability{"NET_RAW", "MKNOD", "AUDIT_WRITE", "SYS_CHROOT"},
+				},
+				SeccompProfile: &appcorev1.SeccompProfileApplyConfiguration{
+					Type: (*corev1.SeccompProfileType)(util.StringPtr(string(corev1.SeccompProfileTypeRuntimeDefault))),
+				},
+			},
 		},
 	}
 
@@ -81,6 +94,8 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 			},
 			Spec: &appcorev1.PodSpecApplyConfiguration{
 				Containers: container,
+				// Tenant workloads never need to talk to the Kubernetes API.
+				AutomountServiceAccountToken: util.BoolPtr(false),
 			},
 		},
 	}

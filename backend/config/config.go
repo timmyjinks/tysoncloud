@@ -58,7 +58,7 @@ func Load() (Config, error) {
 			APIKey:     getStringOrDie("SUPABASE_API_KEY"),
 		},
 		Github: Github{
-			WebhookSecret:     getString("GITHUB_WEBHOOK_SECRET", ""),
+			WebhookSecret:     getStringOrDie("GITHUB_WEBHOOK_SECRET"),
 			AppSlug:           getString("GITHUB_APP_SLUG", ""),
 			AppID:             getString("GITHUB_APP_ID", ""),
 			AppPrivateKey:     getString("GITHUB_APP_PRIVATE_KEY", ""),

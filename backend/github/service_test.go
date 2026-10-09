@@ -1,8 +1,13 @@
 package github
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"reflect"
 	"testing"
+
+	"github.com/timmyjinks/tysoncloud/config"
 )
 
 func TestRailpackEnvArgs(t *testing.T) {
@@ -73,5 +78,34 @@ func TestExportEnv(t *testing.T) {
 	}
 	if got := exportEnv(base, nil); !reflect.DeepEqual(got, base) {
 		t.Fatalf("nil env changed base: %v", got)
+	}
+}
+
+func TestVerifyWebhookSignature(t *testing.T) {
+	body := []byte(`{"zen":"Keep it logically awesome."}`)
+	mac := hmac.New(sha256.New, []byte("s3cret"))
+	mac.Write(body)
+	valid := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+	tests := []struct {
+		name      string
+		secret    string
+		signature string
+		want      bool
+	}{
+		{name: "empty secret fails closed", secret: "", signature: valid, want: false},
+		{name: "empty secret and signature fails closed", secret: "", signature: "", want: false},
+		{name: "missing signature", secret: "s3cret", signature: "", want: false},
+		{name: "wrong signature", secret: "s3cret", signature: "sha256=deadbeef", want: false},
+		{name: "signed with another secret", secret: "other", signature: valid, want: false},
+		{name: "valid signature", secret: "s3cret", signature: valid, want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewService(config.Github{WebhookSecret: tt.secret}, config.Registry{})
+			if got := s.VerifyWebhookSignature(tt.signature, body); got != tt.want {
+				t.Fatalf("VerifyWebhookSignature() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

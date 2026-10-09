@@ -83,6 +83,11 @@ spec:
                 secretKeyRef:
                   key: SUPABASE_API_KEY
                   name: tysoncloud-backend
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: GITHUB_WEBHOOK_SECRET
+                  name: tysoncloud-backend
             - name: GITHUB_APP_SLUG
               value: tysoncloud
             - name: GITHUB_APP_ID

@@ -79,7 +79,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"installation"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
 		if payload.Deleted {
@@ -262,7 +262,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"installation"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
 		installationId := strconv.FormatInt(payload.Installation.Id, 10)
@@ -307,7 +307,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"installation"`
 		}
 		if err := json.Unmarshal(body, &payload); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
 		installationId := strconv.FormatInt(payload.Installation.Id, 10)
@@ -444,7 +444,7 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			} `json:"installation"`
 		}
 		if err := json.Unmarshal(body, &cpayload); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, "invalid payload", http.StatusBadRequest)
 			return
 		}
 		if cpayload.Action != "edited" || cpayload.Issue.PullRequest == nil {

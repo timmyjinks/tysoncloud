@@ -73,7 +73,7 @@ func (app *Application) GithubRepos(w http.ResponseWriter, r *http.Request) {
 	if resp.StatusCode == http.StatusUnauthorized {
 		body, _ := io.ReadAll(resp.Body)
 		slog.Error("GitHub Bad credentials", "installation_id", installationId, "app_id", app.Config.Github.AppID, "status", resp.StatusCode, "body", string(body))
-		writeError(w, http.StatusBadGateway, "GitHub Bad credentials - check GITHUB_APP_ID/PRIVATE_KEY and that installation 157404346 belongs to app tysoncloud", nil)
+		writeError(w, http.StatusBadGateway, "GitHub rejected our credentials for this installation. Please try again later.", nil)
 		return
 	}
 

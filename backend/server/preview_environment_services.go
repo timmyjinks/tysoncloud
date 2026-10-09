@@ -13,7 +13,6 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2"
 	clerkjwt "github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/gorilla/mux"
-	"github.com/gorilla/websocket"
 	"github.com/timmyjinks/tysoncloud/deploy"
 	"github.com/timmyjinks/tysoncloud/store"
 	"github.com/timmyjinks/tysoncloud/util"
@@ -398,14 +397,10 @@ func (app *Application) GetPreviewEnvironmentServiceLogs(w http.ResponseWriter, 
 		return
 	}
 
-	token := r.URL.Query().Get("token")
+	token := wsSessionToken(r)
 	if token == "" {
-		cookie, cookieErr := r.Cookie("__session")
-		if cookieErr != nil {
-			writeError(w, http.StatusUnauthorized, msgUnauthorized, cookieErr)
-			return
-		}
-		token = cookie.Value
+		writeError(w, http.StatusUnauthorized, msgUnauthorized, nil)
+		return
 	}
 	claims, err := clerkjwt.Verify(r.Context(), &clerkjwt.VerifyParams{Token: token})
 	if err != nil {
@@ -448,16 +443,7 @@ func (app *Application) GetPreviewEnvironmentServiceLogs(w http.ResponseWriter, 
 		return
 	}
 
-	allowedOrigins := parseAllowedOrigins(app.Config.Server.AllowedOrigins)
-	upgrader := websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			if origin == "" {
-				return true
-			}
-			return allowedOrigins[origin]
-		},
-	}
+	upgrader := app.newUpgrader()
 	ws, err := upgrader.Upgrade(w, r, http.Header{})
 	if err != nil {
 		slog.Error("preview log stream upgrade failed", "err", err)

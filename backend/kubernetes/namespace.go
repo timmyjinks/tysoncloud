@@ -39,3 +39,19 @@ func (d *KubernetesService) CreateNamespace(ctx context.Context, namespace strin
 func (d *KubernetesService) DeleteNamespace(ctx context.Context, namespace string) error {
 	return d.clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 }
+
+// ListManagedNamespaces returns every namespace created by tysoncloud
+// (project and preview namespaces).
+func (d *KubernetesService) ListManagedNamespaces(ctx context.Context) ([]string, error) {
+	list, err := d.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
+		LabelSelector: "managed-by=tysoncloud",
+	})
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(list.Items))
+	for _, ns := range list.Items {
+		names = append(names, ns.Name)
+	}
+	return names, nil
+}

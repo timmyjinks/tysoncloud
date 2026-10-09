@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
+	"log/slog"
+	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/timmyjinks/tysoncloud/config"
@@ -31,6 +34,14 @@ func main() {
 	}
 
 	deployService := deploy.NewDeployService(kubernetesService)
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		if err := deployService.ReconcileProjects(ctx); err != nil {
+			slog.Error("reconcile project namespaces failed", "err", err)
+		}
+	}()
 
 	githubService := github.NewService(cfg.Github, cfg.Registry)
 

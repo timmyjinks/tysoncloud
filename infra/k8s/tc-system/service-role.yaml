@@ -43,7 +43,8 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["namespaces"]
-    verbs: ["get", "create", "patch", "delete"]
+    # list: startup reconcile of managed-by=tysoncloud namespaces.
+    verbs: ["get", "list", "create", "patch", "delete"]
   - apiGroups: [""]
     resources: ["secrets", "services", "persistentvolumeclaims", "resourcequotas", "limitranges"]
     verbs: ["get", "create", "patch", "delete"]

@@ -8,10 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -138,6 +140,96 @@ func (s *Service) GetInstallationToken(ctx context.Context, installationId strin
 		return "", fmt.Errorf("empty token from github")
 	}
 	return out.Token, nil
+}
+
+// ErrInstallationNotOwned is returned when the GitHub user who completed the
+// install flow cannot access the installation they are trying to connect.
+var ErrInstallationNotOwned = errors.New("github installation is not accessible to this user")
+
+// VerifyUserInstallation proves that the GitHub user who completed the app
+// install flow can access installationId. code is the user-authorization code
+// GitHub appends to the setup URL when "Request user authorization (OAuth)
+// during installation" is enabled on the app.
+func (s *Service) VerifyUserInstallation(ctx context.Context, code string, installationId int64) error {
+	if s.cfg.ClientID == "" || s.cfg.ClientSecret == "" {
+		return fmt.Errorf("github app oauth not configured: set GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET")
+	}
+	if code == "" {
+		return ErrInstallationNotOwned
+	}
+
+	userToken, err := s.exchangeUserCode(ctx, code)
+	if err != nil {
+		return err
+	}
+
+	for page := 1; page <= 10; page++ {
+		req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.github.com/user/installations?per_page=100&page=%d", page), nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Authorization", "Bearer "+userToken)
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("github user installations lookup failed %d: %s", resp.StatusCode, string(body))
+		}
+		var out struct {
+			Installations []struct {
+				Id int64 `json:"id"`
+			} `json:"installations"`
+		}
+		if err := json.Unmarshal(body, &out); err != nil {
+			return err
+		}
+		for _, inst := range out.Installations {
+			if inst.Id == installationId {
+				return nil
+			}
+		}
+		if len(out.Installations) < 100 {
+			break
+		}
+	}
+	return ErrInstallationNotOwned
+}
+
+func (s *Service) exchangeUserCode(ctx context.Context, code string) (string, error) {
+	form := url.Values{
+		"client_id":     {s.cfg.ClientID},
+		"client_secret": {s.cfg.ClientSecret},
+		"code":          {code},
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://github.com/login/oauth/access_token", strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var out struct {
+		AccessToken string `json:"access_token"`
+		Error       string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return "", fmt.Errorf("github code exchange: %w", err)
+	}
+	if out.AccessToken == "" {
+		// Expired, reused, or forged codes all land here.
+		return "", fmt.Errorf("%w: code exchange failed: %s", ErrInstallationNotOwned, out.Error)
+	}
+	return out.AccessToken, nil
 }
 
 func (s *Service) generateAppJWT() (string, error) {

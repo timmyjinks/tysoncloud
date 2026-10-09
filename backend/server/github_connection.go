@@ -2,11 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/gorilla/mux"
+	gh "github.com/timmyjinks/tysoncloud/github"
 )
 
 func (app *Application) GetGithubConnections(w http.ResponseWriter, r *http.Request) {
@@ -44,12 +46,24 @@ func (app *Application) CreateGithubConnection(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	if existing, err := app.Supabase.GetGithubConnection(claims.Subject); err == nil && existing.Id != "" {
-		if existing.InstallationId == req.InstallationId {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(existing)
+	existing, existingErr := app.Supabase.GetGithubConnection(claims.Subject)
+	if existingErr == nil && existing.Id != "" && existing.InstallationId == req.InstallationId {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(existing)
+		return
+	}
+
+	if err := app.Github.VerifyUserInstallation(r.Context(), req.Code, req.InstallationId); err != nil {
+		if errors.Is(err, gh.ErrInstallationNotOwned) {
+			slog.Warn("CreateGithubConnection: installation ownership not proven", "user_id", claims.Subject, "installation_id", req.InstallationId, "err", err)
+			writeError(w, http.StatusForbidden, "We couldn't confirm you have access to that GitHub installation. Please install the app again.", nil)
 			return
 		}
+		writeError(w, http.StatusInternalServerError, "Couldn't verify the GitHub installation.", err)
+		return
+	}
+
+	if existingErr == nil && existing.Id != "" {
 		_ = app.Supabase.DeleteGithubConnection(existing.Id, claims.Subject)
 	}
 

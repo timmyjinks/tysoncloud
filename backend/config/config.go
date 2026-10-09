@@ -30,6 +30,8 @@ type Github struct {
 	AppID             string `env:"GITHUB_APP_ID"`
 	AppPrivateKey     string `env:"GITHUB_APP_PRIVATE_KEY"`
 	InstallationToken string `env:"GITHUB_INSTALLATION_TOKEN"`
+	ClientID          string `env:"GITHUB_APP_CLIENT_ID"`
+	ClientSecret      string `env:"GITHUB_APP_CLIENT_SECRET"`
 }
 
 type Registry struct {
@@ -63,6 +65,8 @@ func Load() (Config, error) {
 			AppID:             getString("GITHUB_APP_ID", ""),
 			AppPrivateKey:     getString("GITHUB_APP_PRIVATE_KEY", ""),
 			InstallationToken: getString("GITHUB_INSTALLATION_TOKEN", ""),
+			ClientID:          getString("GITHUB_APP_CLIENT_ID", ""),
+			ClientSecret:      getString("GITHUB_APP_CLIENT_SECRET", ""),
 		},
 		Registry: Registry{
 			URL: getString("REGISTRY_URL", "10.43.41.193:5000"),

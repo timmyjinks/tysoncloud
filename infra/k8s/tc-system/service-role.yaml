@@ -33,15 +33,54 @@ metadata:
   name: tysoncloud-backend
   namespace: tc-system
 ---
+# Least-privilege role for the API: exactly the resources/verbs used in
+# backend/kubernetes/*.go. Server-side Apply needs create+patch; nothing here
+# can touch RBAC, nodes, or cluster-scoped objects other than namespaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tysoncloud-backend
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "services", "persistentvolumeclaims", "resourcequotas", "limitranges"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    # update: volume attach/detach does Get + Update (kubernetes/volume.go).
+    verbs: ["get", "create", "update", "patch", "delete"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "create", "patch", "delete"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["get", "create", "patch", "delete"]
+---
+# Named differently from the old cluster-admin binding because roleRef is
+# immutable; Flux prunes the old `tysoncloud-backend` binding.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: tysoncloud-backend
+  name: tysoncloud-backend-scoped
 subjects:
   - kind: ServiceAccount
     name: tysoncloud-backend
     namespace: tc-system
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: tysoncloud-backend
   apiGroup: rbac.authorization.k8s.io

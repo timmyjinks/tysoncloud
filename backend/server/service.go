@@ -148,7 +148,7 @@ func (app *Application) GetServiceLogs(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer close(lines)
 		svc := deploy.Service{
-			Namespace: "proj-" + projectId,
+			Namespace: "proj-" + service.ProjectId,
 			Name:      service.ResourceName,
 		}
 		status := strings.ToLower(strings.TrimSpace(service.Status))
@@ -351,7 +351,7 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + res.ProjectId,
 		Name:      res.ResourceName,
 		Hostname:  res.PublicDomain,
 		Env:       util.ParseEnv(env),
@@ -390,6 +390,12 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	service, err := app.Supabase.GetService(serviceId, claims.Subject)
+	if err != nil || service.ProjectId != projectId {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+
 	if err := app.Supabase.DeleteService(serviceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
 		return
@@ -401,7 +407,7 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 	// this branch returned with NO response written at all on a k8s
 	// error, silently leaving the request hanging as an empty 200.)
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + service.ProjectId,
 		Name:      "svc-" + serviceId,
 	}); err != nil {
 		slog.Error("failed to clean up service infrastructure", "service_id", serviceId, "err", err)
@@ -437,13 +443,19 @@ func (app *Application) DeleteServices(w http.ResponseWriter, r *http.Request) {
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, serviceId := range req.Ids {
+		service, err := app.Supabase.GetService(serviceId, claims.Subject)
+		if err != nil || service.ProjectId != projectId {
+			failed = append(failed, FailedDelete{Id: serviceId, Error: "We couldn't find that service."})
+			continue
+		}
+
 		if err := app.Supabase.DeleteService(serviceId, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: serviceId, Error: "Couldn't delete the service."})
 			continue
 		}
 
 		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
-			Namespace: "proj-" + projectId,
+			Namespace: "proj-" + service.ProjectId,
 			Name:      "svc-" + serviceId,
 		}); err != nil {
 			slog.Error("failed to clean up service infrastructure", "service_id", serviceId, "err", err)

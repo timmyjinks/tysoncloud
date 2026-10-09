@@ -176,7 +176,7 @@ func (app *Application) UpdateDatabase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := app.Deploy.CreateDatabase(r.Context(), deploy.Database{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + res.ProjectId,
 		Name:      res.ResourceName,
 		Engine:    res.Engine,
 		StorageGB: *database.StorageGB,
@@ -205,13 +205,19 @@ func (app *Application) DeleteDatabase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	database, err := app.Supabase.GetDatabase(databaseId, claims.Subject)
+	if err != nil || database.ProjectId != projectId {
+		writeError(w, http.StatusNotFound, "We couldn't find that database.", err)
+		return
+	}
+
 	if err := app.Supabase.DeleteDatabase(databaseId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the database.", err)
 		return
 	}
 
 	if err := app.Deploy.DeleteDatabase(r.Context(), deploy.Database{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + database.ProjectId,
 		Name:      "db-" + databaseId,
 		Engine:    "postgres",
 	}); err != nil {
@@ -249,13 +255,19 @@ func (app *Application) DeleteDatabases(w http.ResponseWriter, r *http.Request) 
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, databaseId := range req.Ids {
+		database, err := app.Supabase.GetDatabase(databaseId, claims.Subject)
+		if err != nil || database.ProjectId != projectId {
+			failed = append(failed, FailedDelete{Id: databaseId, Error: "We couldn't find that database."})
+			continue
+		}
+
 		if err := app.Supabase.DeleteDatabase(databaseId, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: databaseId, Error: "Couldn't delete the database."})
 			continue
 		}
 
 		if err := app.Deploy.DeleteDatabase(r.Context(), deploy.Database{
-			Namespace: "proj-" + projectId,
+			Namespace: "proj-" + database.ProjectId,
 			Name:      "db-" + databaseId,
 			Engine:    "postgres",
 		}); err != nil {

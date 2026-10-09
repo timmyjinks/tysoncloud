@@ -19,6 +19,12 @@ func (d *KubernetesService) CreateNamespace(ctx context.Context, namespace strin
 			Name: util.StringPtr(namespace),
 			Labels: map[string]string{
 				"managed-by": "tysoncloud",
+				// Pod Security Admission: block privileged/host-level pods
+				// in tenant namespaces, and surface anything that misses
+				// the stricter "restricted" profile.
+				"pod-security.kubernetes.io/enforce": "baseline",
+				"pod-security.kubernetes.io/warn":    "restricted",
+				"pod-security.kubernetes.io/audit":   "restricted",
 			},
 		},
 	}, metav1.ApplyOptions{

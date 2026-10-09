@@ -10,11 +10,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
-
 type TaskRegistry struct {
 	mu       sync.Mutex
 	registry map[string](chan string)
@@ -43,6 +38,7 @@ func (app *Application) HandleTaskWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	upgrader := app.newUpgrader()
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {

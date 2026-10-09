@@ -105,7 +105,7 @@ VITE_API_URL=http://localhost:8080
 
 See `frontend/.env.example` for the frontend variables.
 
-Backend config defaults (`backend/config/config.go:30`): `ADDR=:8080`, `ALLOWED_ORIGINS=http://localhost:3000`, `CLUSTER_IP=192.168.0.18`, `KUBECONFIG=~/.kube/config`.
+Backend config defaults (`backend/config/config.go:30`): `ADDR=:8080`, `CLUSTER_IP=192.168.0.18`, `KUBECONFIG=~/.kube/config`. `ALLOWED_ORIGINS` defaults to the production frontends only; set `ALLOWED_ORIGINS=http://localhost:3000` for local dev (Docker Compose already does).
 
 ### 3. Run with Docker Compose
 

@@ -51,7 +51,7 @@ func Load() (Config, error) {
 	return Config{
 		Server: Server{
 			Addr:           getString("ADDR", ":8080"),
-			AllowedOrigins: getString("ALLOWED_ORIGINS", "http://localhost:3000"),
+			AllowedOrigins: getString("ALLOWED_ORIGINS", ""),
 			ClerkApiKey:    getStringOrDie("CLERK_API_KEY"),
 			ClusterIp:      getString("CLUSTER_IP", "192.168.0.18"),
 		},

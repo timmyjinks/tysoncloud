@@ -302,6 +302,10 @@ func railpackEnvArgs(env map[string][]byte) []string {
 	return args
 }
 
+// railpackFrontendImage is the BuildKit frontend that executes railpack plans.
+// Keep its version in sync with RAILPACK_VERSION in cmd/deploy/Dockerfile.
+const railpackFrontendImage = "ghcr.io/railwayapp/railpack-frontend:v0.40.1@sha256:f1973377693af30c9b37a92c97c661c07b277ccdc6be909213c74c771f8d2d6d"
+
 // minScrubbedSecretLen skips very short values (e.g. PORT=80, DEBUG=1) that
 // would otherwise mask unrelated log text.
 const minScrubbedSecretLen = 6
@@ -728,7 +732,7 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		"--local", "context=" + buildContext,
 		"--local", "dockerfile=" + planDir,
 		"--frontend=gateway.v0",
-		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest",
+		"--opt", "source=" + railpackFrontendImage,
 	}
 	if secretArgs := buildctlSecretArgs(env); len(secretArgs) > 0 {
 		buildArgs = append(buildArgs, secretArgs...)

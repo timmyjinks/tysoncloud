@@ -25,13 +25,14 @@ type Server struct {
 }
 
 type Github struct {
-	WebhookSecret     string `env:"GITHUB_WEBHOOK_SECRET"`
-	AppSlug           string `env:"GITHUB_APP_SLUG"`
-	AppID             string `env:"GITHUB_APP_ID"`
-	AppPrivateKey     string `env:"GITHUB_APP_PRIVATE_KEY"`
-	InstallationToken string `env:"GITHUB_INSTALLATION_TOKEN"`
-	ClientID          string `env:"GITHUB_APP_CLIENT_ID"`
-	ClientSecret      string `env:"GITHUB_APP_CLIENT_SECRET"`
+	WebhookSecret       string `env:"GITHUB_WEBHOOK_SECRET"`
+	AppSlug             string `env:"GITHUB_APP_SLUG"`
+	AppID               string `env:"GITHUB_APP_ID"`
+	AppPrivateKey       string `env:"GITHUB_APP_PRIVATE_KEY"`
+	InstallationToken   string `env:"GITHUB_INSTALLATION_TOKEN"`
+	ClientID            string `env:"GITHUB_APP_CLIENT_ID"`
+	ClientSecret        string `env:"GITHUB_APP_CLIENT_SECRET"`
+	MaxConcurrentBuilds int    `env:"MAX_CONCURRENT_BUILDS"`
 }
 
 type Registry struct {
@@ -60,13 +61,14 @@ func Load() (Config, error) {
 			APIKey:     getStringOrDie("SUPABASE_API_KEY"),
 		},
 		Github: Github{
-			WebhookSecret:     getStringOrDie("GITHUB_WEBHOOK_SECRET"),
-			AppSlug:           getString("GITHUB_APP_SLUG", ""),
-			AppID:             getString("GITHUB_APP_ID", ""),
-			AppPrivateKey:     getString("GITHUB_APP_PRIVATE_KEY", ""),
-			InstallationToken: getString("GITHUB_INSTALLATION_TOKEN", ""),
-			ClientID:          getString("GITHUB_APP_CLIENT_ID", ""),
-			ClientSecret:      getString("GITHUB_APP_CLIENT_SECRET", ""),
+			WebhookSecret:       getStringOrDie("GITHUB_WEBHOOK_SECRET"),
+			AppSlug:             getString("GITHUB_APP_SLUG", ""),
+			AppID:               getString("GITHUB_APP_ID", ""),
+			AppPrivateKey:       getString("GITHUB_APP_PRIVATE_KEY", ""),
+			InstallationToken:   getString("GITHUB_INSTALLATION_TOKEN", ""),
+			ClientID:            getString("GITHUB_APP_CLIENT_ID", ""),
+			ClientSecret:        getString("GITHUB_APP_CLIENT_SECRET", ""),
+			MaxConcurrentBuilds: getInt("MAX_CONCURRENT_BUILDS", 2),
 		},
 		Registry: Registry{
 			URL: getString("REGISTRY_URL", "10.43.41.193:5000"),

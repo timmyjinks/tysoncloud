@@ -29,13 +29,34 @@ import (
 )
 
 type Service struct {
-	cfg  config.Github
-	reg  config.Registry
-	logs *BuildLogStore
+	cfg    config.Github
+	reg    config.Registry
+	logs   *BuildLogStore
+	builds chan struct{}
 }
 
 func NewService(cfg config.Github, reg config.Registry) *Service {
-	return &Service{cfg: cfg, reg: reg, logs: NewBuildLogStore()}
+	slots := cfg.MaxConcurrentBuilds
+	if slots <= 0 {
+		slots = 2
+	}
+	return &Service{cfg: cfg, reg: reg, logs: NewBuildLogStore(), builds: make(chan struct{}, slots)}
+}
+
+// acquireBuildSlot blocks until one of the MaxConcurrentBuilds slots is free
+// (or ctx ends), so floods of pushes/PRs queue instead of exhausting BuildKit.
+func (s *Service) acquireBuildSlot(ctx context.Context, emit func(string)) (func(), error) {
+	select {
+	case s.builds <- struct{}{}:
+	default:
+		emit("[state] building: queued, waiting for a free build slot")
+		select {
+		case s.builds <- struct{}{}:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	return func() { <-s.builds }, nil
 }
 
 func (s *Service) AppendBuildLog(serviceID, line string) {
@@ -365,6 +386,13 @@ func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessTok
 		}
 	}
 
+	release, err := s.acquireBuildSlot(ctx, emit)
+	if err != nil {
+		emitErr("build cancelled while queued", err, "")
+		return "", err
+	}
+	defer release()
+
 	emit(fmt.Sprintf("[state] building: cloning %s root_dir=%s branch=%s", cloneURL, rootDir, branch))
 	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, branch, logFn)
 	if err != nil {
@@ -407,6 +435,13 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 			logFn(fmt.Sprintf("%s: %v", msg, err))
 		}
 	}
+
+	release, err := s.acquireBuildSlot(ctx, emit)
+	if err != nil {
+		emitErr("build cancelled while queued", err, "")
+		return "", err
+	}
+	defer release()
 
 	emit(fmt.Sprintf("[state] building: cloning PR head %s ref=%s sha=%s root_dir=%s", cloneURL, headRef, headSHA, rootDir))
 	cloneDir, err := cloneRepoWithLogs(ctx, cloneURL, accessToken, headRef, logFn)

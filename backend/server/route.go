@@ -2,20 +2,32 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
 	"github.com/gorilla/mux"
+	"golang.org/x/time/rate"
 )
 
 func (s *Application) registerRoutes(
 	r *mux.Router,
 ) error {
 
+	// Per-user API budget and a tighter one for routes that start builds.
+	// The webhook is deliberately not rate limited: a shared bucket checked
+	// before signature verification would let unsigned junk starve real
+	// GitHub deliveries; webhook builds are bounded by the build semaphore.
+	apiLimit := newRateLimiter(rate.Limit(10), 40)
+	buildLimit := newRateLimiter(rate.Every(20*time.Second), 5)
+
 	authed := func(h http.HandlerFunc) http.Handler {
-		return clerkhttp.RequireHeaderAuthorization()(h)
+		return clerkhttp.RequireHeaderAuthorization()(apiLimit.perUser(h))
 	}
 	projectOwned := func(h http.HandlerFunc) http.Handler {
-		return clerkhttp.RequireHeaderAuthorization()(s.RequireProjectOwner(h))
+		return clerkhttp.RequireHeaderAuthorization()(apiLimit.perUser(s.RequireProjectOwner(h)))
+	}
+	projectOwnedBuild := func(h http.HandlerFunc) http.Handler {
+		return clerkhttp.RequireHeaderAuthorization()(apiLimit.perUser(buildLimit.perUser(s.RequireProjectOwner(h))))
 	}
 
 	r.Use(s.CORSMiddleware)
@@ -38,9 +50,9 @@ func (s *Application) registerRoutes(
 	r.Handle("/github_services/{github_service_id}", authed(s.GetGithubService)).Methods("GET")
 	r.Handle("/projects/{project_id}/github_services", projectOwned(s.GetGithubServices)).Methods("GET")
 	r.Handle("/projects/{project_id}/github_services", projectOwned(s.DeleteGithubServices)).Methods("DELETE")
-	r.Handle("/projects/{project_id}/github_services", projectOwned(s.CreateGithubService)).Methods("POST")
-	r.Handle("/projects/{project_id}/github_services/{github_service_id}", projectOwned(s.UpdateGithubService)).Methods("PUT")
-	r.Handle("/projects/{project_id}/github_services/{github_service_id}/redeploy", projectOwned(s.RedeployGithubService)).Methods("POST")
+	r.Handle("/projects/{project_id}/github_services", projectOwnedBuild(s.CreateGithubService)).Methods("POST")
+	r.Handle("/projects/{project_id}/github_services/{github_service_id}", projectOwnedBuild(s.UpdateGithubService)).Methods("PUT")
+	r.Handle("/projects/{project_id}/github_services/{github_service_id}/redeploy", projectOwnedBuild(s.RedeployGithubService)).Methods("POST")
 	r.Handle("/projects/{project_id}/github_services/{github_service_id}", projectOwned(s.DeleteGithubService)).Methods("DELETE")
 	r.HandleFunc("/projects/{project_id}/github_services/{github_service_id}/logs", s.GetGithubServiceLogs).Methods("GET")
 

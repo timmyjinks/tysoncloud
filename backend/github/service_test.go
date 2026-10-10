@@ -28,7 +28,7 @@ func TestRailpackEnvArgs(t *testing.T) {
 		"_PRIVATE": []byte("ok"),
 		"9INVALID": []byte("skip"),
 	})
-	want := []string{"--env", "API_URL=https://x", "--env", "PORT=8080", "--env", "_PRIVATE=ok"}
+	want := []string{"--env", "API_URL", "--env", "PORT", "--env", "_PRIVATE"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
@@ -145,4 +145,49 @@ func TestAcquireBuildSlotLimitsConcurrency(t *testing.T) {
 		t.Fatalf("slot after release: %v", err)
 	}
 	release2()
+}
+
+func TestNewSecretScrubber(t *testing.T) {
+	scrub := newSecretScrubber(map[string][]byte{
+		"DATABASE_URL": []byte("postgres://user:hunter22@db/app"),
+		"API_TOKEN":    []byte("tok_abcdef123"),
+		"PORT":         []byte("8080"),
+	})
+	in := "connecting to postgres://user:hunter22@db/app with tok_abcdef123 on 8080"
+	want := "connecting to [redacted:DATABASE_URL] with [redacted:API_TOKEN] on 8080"
+	if got := scrub(in); got != want {
+		t.Fatalf("scrub() = %q, want %q", got, want)
+	}
+
+	noop := newSecretScrubber(nil)
+	if got := noop("unchanged"); got != "unchanged" {
+		t.Fatalf("empty env scrub changed input: %q", got)
+	}
+}
+
+func TestNewSecretScrubberPrefersLongestAndSplitsLines(t *testing.T) {
+	scrub := newSecretScrubber(map[string][]byte{
+		"API_KEY":     []byte("abcdef"),
+		"TOKEN":       []byte("abcdef9f8e7d"),
+		"PRIVATE_KEY": []byte("-----BEGIN KEY-----\nMIIEvQIBADANBg\n-----END KEY-----\n"),
+	})
+	if got, want := scrub("token=abcdef9f8e7d"), "token=[redacted:TOKEN]"; got != want {
+		t.Fatalf("scrub() = %q, want %q", got, want)
+	}
+	if got, want := scrub("MIIEvQIBADANBg"), "[redacted:PRIVATE_KEY]"; got != want {
+		t.Fatalf("multi-line secret line: scrub() = %q, want %q", got, want)
+	}
+}
+
+func TestRailpackEnvKeysSkipsReservedProcessVars(t *testing.T) {
+	got := railpackEnvKeys(map[string][]byte{
+		"API_URL":         []byte("x"),
+		"PATH":            []byte("/evil"),
+		"https_proxy":     []byte("http://attacker"),
+		"BUILDKIT_HOST":   []byte("tcp://attacker:1234"),
+		"GIT_SSH_COMMAND": []byte("sh"),
+	})
+	if want := []string{"API_URL"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }

@@ -29,10 +29,9 @@ spec:
       labels:
         app: registry-config
     spec:
-      hostPID: true
       containers:
         - name: configure
-          image: busybox:1.36
+          image: busybox:1.36@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
           command:
             - /bin/sh
             - -c
@@ -62,9 +61,12 @@ spec:
               fi
               # Keep pod alive to satisfy DaemonSet; re-sync every 60s in case file is removed
               while true; do sleep 60; cp /config/hosts.toml "$HOSTS_DIR/hosts.toml" || true; done
+          # Only the two host directories the script writes, not all of /etc.
           volumeMounts:
-            - name: host-etc
-              mountPath: /host/etc
+            - name: host-containerd-certs
+              mountPath: /host/etc/containerd/certs.d
+            - name: host-k3s-config
+              mountPath: /host/etc/rancher/k3s
             - name: config
               mountPath: /config
               readOnly: true
@@ -75,13 +77,19 @@ spec:
             limits:
               cpu: 50m
               memory: 32Mi
+          # Writing root-owned files on a hostPath needs root, not privileged.
           securityContext:
-            privileged: true
+            privileged: false
+            allowPrivilegeEscalation: false
       volumes:
-        - name: host-etc
+        - name: host-containerd-certs
           hostPath:
-            path: /etc
-            type: Directory
+            path: /etc/containerd/certs.d
+            type: DirectoryOrCreate
+        - name: host-k3s-config
+          hostPath:
+            path: /etc/rancher/k3s
+            type: DirectoryOrCreate
         - name: config
           configMap:
             name: registry-hosts-toml

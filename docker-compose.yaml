@@ -1,11 +1,12 @@
 services:
   buildkit:
-    image: moby/buildkit:latest
+    image: moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e
     container_name: tysoncloud-buildkit
     restart: unless-stopped
     command: --addr tcp://0.0.0.0:1234 --addr unix:///run/buildkit/buildkitd.sock
+    # Only reachable from the compose network and this host's loopback.
     ports:
-      - "1234:1234"
+      - "127.0.0.1:1234:1234"
     privileged: true
   registry:
     image: registry:2.8

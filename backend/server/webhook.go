@@ -73,7 +73,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			Repository   struct {
 				Id       int64  `json:"id"`
 				FullName string `json:"full_name"`
-				CloneURL string `json:"clone_url"`
 			} `json:"repository"`
 			Installation struct {
 				Id int64 `json:"id"`
@@ -98,11 +97,14 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		repoId := payload.Repository.Id
-		installationId := ""
-		if payload.Installation.Id != 0 {
-			installationId = strconv.FormatInt(payload.Installation.Id, 10)
+		if payload.Installation.Id == 0 {
+			slog.Warn("webhook push: missing installation.id", "repo_id", payload.Repository.Id)
+			http.Error(w, "missing installation.id", http.StatusForbidden)
+			return
 		}
+
+		repoId := payload.Repository.Id
+		installationId := strconv.FormatInt(payload.Installation.Id, 10)
 
 		services, err := app.Supabase.GetGithubServicesByRepoId(repoId)
 		if err != nil {
@@ -117,39 +119,30 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var connectionInstallationId string
-		if installationId != "" {
-			conn, err := app.Supabase.GetGithubConnectionByInstallationId(installationId)
-			if err != nil {
-				slog.Warn("webhook push: unknown installation", "installation_id", installationId, "repo_id", repoId, "err", err)
-				http.Error(w, "unknown installation", http.StatusForbidden)
-				return
+		conn, err := app.Supabase.GetGithubConnectionByInstallationId(installationId)
+		if err != nil {
+			slog.Warn("webhook push: unknown installation", "installation_id", installationId, "repo_id", repoId, "err", err)
+			http.Error(w, "unknown installation", http.StatusForbidden)
+			return
+		}
+		authorized := false
+		for _, svc := range services {
+			if svc.GithubConnectionId == conn.Id {
+				authorized = true
+				break
 			}
-			connectionInstallationId = strconv.FormatInt(conn.InstallationId, 10)
-			authorized := false
-			for _, svc := range services {
-				if svc.GithubConnectionId == conn.Id {
-					authorized = true
-					break
-				}
-			}
-			if !authorized {
-				slog.Warn("webhook push: installation not authorized for repo services", "installation_id", installationId, "repo_id", repoId)
-				http.Error(w, "installation not authorized for this repo", http.StatusForbidden)
-				return
-			}
-		} else {
-			slog.Warn("webhook push: missing installation.id, skipping authz check", "repo_id", repoId)
+		}
+		if !authorized {
+			slog.Warn("webhook push: installation not authorized for repo services", "installation_id", installationId, "repo_id", repoId)
+			http.Error(w, "installation not authorized for this repo", http.StatusForbidden)
+			return
 		}
 
-		cloneURL := payload.Repository.CloneURL
-		if cloneURL == "" && payload.Repository.FullName != "" {
-			cloneURL = fmt.Sprintf("https://github.com/%s.git", payload.Repository.FullName)
-		}
-		accessToken := ""
-		if installationId != "" {
-			accessToken, _ = app.Github.GetInstallationToken(r.Context(), installationId)
-			_ = connectionInstallationId
+		accessToken, err := app.Github.GetInstallationToken(r.Context(), installationId)
+		if err != nil || accessToken == "" {
+			slog.Error("webhook push: failed to mint installation token", "installation_id", installationId, "repo_id", repoId, "err", err)
+			http.Error(w, "could not authenticate to github", http.StatusInternalServerError)
+			return
 		}
 
 		for _, svc := range services {
@@ -161,12 +154,14 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 				slog.Info("webhook push: ignoring branch mismatch", "service_id", svc.Id, "service_branch", svcBranch, "pushed_branch", pushedBranch, "repo_id", repoId)
 				continue
 			}
-			if installationId != "" && connectionInstallationId != "" {
-				conn, _ := app.Supabase.GetGithubConnectionByInstallationId(installationId)
-				if svc.GithubConnectionId != conn.Id {
-					slog.Warn("skipping service not belonging to installation", "service_id", svc.Id, "installation_id", installationId)
-					continue
-				}
+			if svc.GithubConnectionId != conn.Id {
+				slog.Warn("skipping service not belonging to installation", "service_id", svc.Id, "installation_id", installationId)
+				continue
+			}
+			cloneURL, err := util.GithubCloneURL(svc.RepoName)
+			if err != nil {
+				slog.Error("invalid repo_name stored for service, skipping deploy", "service_id", svc.Id, "repo_name", svc.RepoName, "err", err)
+				continue
 			}
 
 			sanitizedRootDir, err := util.SanitizeRootDir(svc.RootDir)
@@ -299,7 +294,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 					Ref  string `json:"ref"`
 					Sha  string `json:"sha"`
 					Repo struct {
-						CloneURL string `json:"clone_url"`
 						FullName string `json:"full_name"`
 					} `json:"repo"`
 				} `json:"head"`
@@ -307,7 +301,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			Repository struct {
 				Id       int64  `json:"id"`
 				FullName string `json:"full_name"`
-				CloneURL string `json:"clone_url"`
 			} `json:"repository"`
 			Installation struct {
 				Id int64 `json:"id"`
@@ -387,12 +380,15 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		headCloneURL := strings.TrimSpace(payload.PullRequest.Head.Repo.CloneURL)
-		if headCloneURL == "" {
-			headCloneURL = strings.TrimSpace(payload.Repository.CloneURL)
+		headRepo := strings.TrimSpace(payload.PullRequest.Head.Repo.FullName)
+		if headRepo == "" {
+			headRepo = payload.Repository.FullName
 		}
-		if headCloneURL == "" && payload.Repository.FullName != "" {
-			headCloneURL = fmt.Sprintf("https://github.com/%s.git", payload.Repository.FullName)
+		headCloneURL, err := util.GithubCloneURL(headRepo)
+		if err != nil {
+			slog.Warn("preview deploy: invalid head repo", "repo_id", payload.Repository.Id, "head_repo", headRepo, "err", err)
+			http.Error(w, "invalid head repository", http.StatusBadRequest)
+			return
 		}
 		headRef := strings.TrimSpace(payload.PullRequest.Head.Ref)
 		headSHA := strings.TrimSpace(payload.PullRequest.Head.Sha)
@@ -442,7 +438,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			Repository struct {
 				Id       int64  `json:"id"`
 				FullName string `json:"full_name"`
-				CloneURL string `json:"clone_url"`
 			} `json:"repository"`
 			Installation struct {
 				Id int64 `json:"id"`
@@ -509,12 +504,15 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		cheadSHA, cheadRef, cheadCloneURL := app.fetchPRHead(r.Context(), ctoken, cpayload.Repository.FullName, cpayload.Issue.Number)
-		if cheadCloneURL == "" {
-			cheadCloneURL = strings.TrimSpace(cpayload.Repository.CloneURL)
+		cheadSHA, cheadRef, cheadRepo := app.fetchPRHead(r.Context(), ctoken, cpayload.Repository.FullName, cpayload.Issue.Number)
+		if cheadRepo == "" {
+			cheadRepo = cpayload.Repository.FullName
 		}
-		if cheadCloneURL == "" && cpayload.Repository.FullName != "" {
-			cheadCloneURL = fmt.Sprintf("https://github.com/%s.git", cpayload.Repository.FullName)
+		cheadCloneURL, cerr := util.GithubCloneURL(cheadRepo)
+		if cerr != nil {
+			slog.Warn("preview retry: invalid head repo", "repo_id", cpayload.Repository.Id, "head_repo", cheadRepo, "err", cerr)
+			http.Error(w, "invalid head repository", http.StatusBadRequest)
+			return
 		}
 		cpr := cpayload.Issue.Number
 		crepoFull := cpayload.Repository.FullName
@@ -1177,7 +1175,7 @@ func (app *Application) markPreviewTornDown(ctx context.Context, token string, r
 	}
 }
 
-func (app *Application) fetchPRHead(ctx context.Context, installationToken, repoFullName string, prNumber int) (sha, ref, cloneURL string) {
+func (app *Application) fetchPRHead(ctx context.Context, installationToken, repoFullName string, prNumber int) (sha, ref, headRepo string) {
 	if installationToken == "" || strings.TrimSpace(repoFullName) == "" || prNumber <= 0 {
 		return "", "", ""
 	}
@@ -1205,7 +1203,6 @@ func (app *Application) fetchPRHead(ctx context.Context, installationToken, repo
 			Ref  string `json:"ref"`
 			Sha  string `json:"sha"`
 			Repo struct {
-				CloneURL string `json:"clone_url"`
 				FullName string `json:"full_name"`
 			} `json:"repo"`
 		} `json:"head"`
@@ -1213,5 +1210,5 @@ func (app *Application) fetchPRHead(ctx context.Context, installationToken, repo
 	if err := json.Unmarshal(body, &out); err != nil {
 		return "", "", ""
 	}
-	return strings.TrimSpace(out.Head.Sha), strings.TrimSpace(out.Head.Ref), strings.TrimSpace(out.Head.Repo.CloneURL)
+	return strings.TrimSpace(out.Head.Sha), strings.TrimSpace(out.Head.Ref), strings.TrimSpace(out.Head.Repo.FullName)
 }

@@ -1,9 +1,11 @@
 package github
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -107,5 +109,17 @@ func TestVerifyWebhookSignature(t *testing.T) {
 				t.Fatalf("VerifyWebhookSignature() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestVerifyUserInstallationFailsClosed(t *testing.T) {
+	unconfigured := NewService(config.Github{}, config.Registry{})
+	if err := unconfigured.VerifyUserInstallation(context.Background(), "code", 1); err == nil {
+		t.Fatal("expected error when oauth client is not configured")
+	}
+
+	configured := NewService(config.Github{ClientID: "id", ClientSecret: "secret"}, config.Registry{})
+	if err := configured.VerifyUserInstallation(context.Background(), "", 1); !errors.Is(err, ErrInstallationNotOwned) {
+		t.Fatalf("empty code err = %v, want ErrInstallationNotOwned", err)
 	}
 }

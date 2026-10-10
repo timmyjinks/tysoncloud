@@ -491,7 +491,7 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	registryURLUpdate := app.Github.RegistryURL()
 	fallbackImage := app.Github.RegistryTag(registryURLUpdate, res.ResourceName, "latest")
 	if err := app.Deploy.CreateService(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + res.ProjectId,
 		Name:      res.ResourceName,
 		Hostname:  res.PublicDomain,
 		Env:       util.ParseEnv(envStr),
@@ -705,7 +705,11 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	svcBefore, _ := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
+	svcBefore, err := app.Supabase.GetGithubService(githubServiceId, claims.Subject)
+	if err != nil || svcBefore.ProjectId != projectId {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
 
 	if err := app.Supabase.DeleteGithubService(githubServiceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't delete the service.", err)
@@ -717,7 +721,7 @@ func (app *Application) DeleteGithubService(w http.ResponseWriter, r *http.Reque
 		resourceName = svcBefore.ResourceName
 	}
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + svcBefore.ProjectId,
 		Name:      resourceName,
 	}); err != nil {
 		slog.Error("failed to clean up github service infrastructure", "service_id", githubServiceId, "err", err)
@@ -753,7 +757,11 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 	deleted := []string{}
 	failed := []FailedDelete{}
 	for _, id := range req.Ids {
-		svcBefore, _ := app.Supabase.GetGithubService(id, claims.Subject)
+		svcBefore, err := app.Supabase.GetGithubService(id, claims.Subject)
+		if err != nil || svcBefore.ProjectId != projectId {
+			failed = append(failed, FailedDelete{Id: id, Error: "We couldn't find that service."})
+			continue
+		}
 		if err := app.Supabase.DeleteGithubService(id, claims.Subject); err != nil {
 			failed = append(failed, FailedDelete{Id: id, Error: "Couldn't delete the service."})
 			continue
@@ -763,7 +771,7 @@ func (app *Application) DeleteGithubServices(w http.ResponseWriter, r *http.Requ
 			resourceName = svcBefore.ResourceName
 		}
 		if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
-			Namespace: "proj-" + projectId,
+			Namespace: "proj-" + svcBefore.ProjectId,
 			Name:      resourceName,
 		}); err != nil {
 			slog.Error("failed to clean up github service infrastructure", "service_id", id, "err", err)
@@ -886,7 +894,7 @@ func (app *Application) GetGithubServiceLogs(w http.ResponseWriter, r *http.Requ
 	go func() {
 		defer close(lines)
 		svcRes := deploy.Service{
-			Namespace: "proj-" + projectId,
+			Namespace: "proj-" + svc.ProjectId,
 			Name:      svc.ResourceName,
 		}
 		isDiagnostic := status == "pending" || status == "failed"

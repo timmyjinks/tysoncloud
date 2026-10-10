@@ -202,7 +202,8 @@ type GithubConnectionResponse struct {
 }
 
 type GithubConnectionCreateRequest struct {
-	InstallationId int64 `json:"installation_id"`
+	InstallationId int64  `json:"installation_id"`
+	Code           string `json:"code"`
 }
 
 type ProjectConfigRequest struct {

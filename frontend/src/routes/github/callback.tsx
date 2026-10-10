@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@clerk/clerk-react";
-import { useCreateGithubConnection } from "@/lib/api/github";
+import { useCreateGithubConnection, useGithubApp } from "@/lib/api/github";
 import { getErrorMessage } from "@/lib/api/client";
 import { ErrorBanner } from "@/components/error-banner";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,26 @@ export const Route = createFileRoute("/github/callback")({
     installation_id: typeof search.installation_id === "string" ? search.installation_id : undefined,
     setup_action: typeof search.setup_action === "string" ? search.setup_action : undefined,
     state: typeof search.state === "string" ? search.state : undefined,
+    code: typeof search.code === "string" ? search.code : undefined,
   }),
   component: GithubCallbackPage,
 });
 
 function GithubCallbackPage() {
   const navigate = useNavigate();
-  const { installation_id, state } = Route.useSearch();
+  const { installation_id, state, code } = Route.useSearch();
   const createConnection = useCreateGithubConnection();
+  const { data: githubApp } = useGithubApp();
+
+  // GitHub's authorization `code` is single-use, so a failed connection can't
+  // be retried with it; send the user back through the install flow instead.
+  const restartInstall = () => {
+    const installUrl = githubApp?.install_url;
+    if (!installUrl) return;
+    window.location.href = state
+      ? `${installUrl}${installUrl.includes("?") ? "&" : "?"}state=${encodeURIComponent(state)}`
+      : installUrl;
+  };
   const { isLoaded, isSignedIn } = useAuth();
 
   const hasOpener = () => {
@@ -53,8 +65,8 @@ function GithubCallbackPage() {
     try {
       if (hasOpener()) {
         window.opener.postMessage(
-          { type: "github-app-installed", installation_id: installationId, state },
-          "*",
+          { type: "github-app-installed", installation_id: installationId, state, code },
+          window.location.origin,
         );
         return true;
       }
@@ -68,14 +80,14 @@ function GithubCallbackPage() {
       notifyOpener(installation_id);
       forceClose();
     }
-  }, [installation_id, state]);
+  }, [installation_id, state, code]);
 
   useEffect(() => {
     if (hasOpener()) return;
     if (!isLoaded || !isSignedIn || !installation_id) return;
     if (createConnection.isSuccess || createConnection.isPending || createConnection.isError) return;
     createConnection.mutate(
-      { installation_id: Number(installation_id) },
+      { installation_id: Number(installation_id), code: code ?? "" },
       {
         onSuccess: () => {
           if (isPopup()) {
@@ -96,7 +108,7 @@ function GithubCallbackPage() {
         },
       },
     );
-  }, [isLoaded, isSignedIn, installation_id, state, createConnection, navigate]);
+  }, [isLoaded, isSignedIn, installation_id, state, code, createConnection, navigate]);
 
   if (!installation_id) {
     return (
@@ -172,7 +184,7 @@ function GithubCallbackPage() {
         )}
         {createConnection.isError && (
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={() => createConnection.mutate({ installation_id: Number(installation_id) })}>Retry</Button>
+            <Button onClick={restartInstall} disabled={!githubApp?.install_url}>Try again</Button>
             <Button variant="outline" onClick={() => forceClose()}>
               Close window
             </Button>
@@ -214,8 +226,8 @@ function GithubCallbackPage() {
         <ErrorBanner className="mt-6" message={getErrorMessage(createConnection.error)} />
       )}
       {createConnection.isError && (
-        <Button className="mt-4" onClick={() => createConnection.mutate({ installation_id: Number(installation_id) })}>
-          Retry
+        <Button className="mt-4" onClick={restartInstall} disabled={!githubApp?.install_url}>
+          Try again
         </Button>
       )}
     </main>

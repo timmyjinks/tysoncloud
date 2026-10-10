@@ -136,6 +136,9 @@ export type GithubConnection = {
 
 export type GithubConnectionCreateRequest = {
   installation_id: number;
+  // GitHub user-authorization code from the install redirect; the backend
+  // exchanges it to prove the user can access the installation.
+  code: string;
 };
 
 export type GithubRepo = {

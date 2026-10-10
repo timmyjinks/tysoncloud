@@ -61,11 +61,12 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
         if (href.includes("/github/callback") && href.includes("installation_id=")) {
           const url = new URL(href);
           const iid = url.searchParams.get("installation_id");
+          const code = url.searchParams.get("code") ?? "";
           if (iid && !handledRef.current) {
             handledRef.current = true;
             window.clearInterval(timer);
             createGithubConnection.mutate(
-              { installation_id: Number(iid) },
+              { installation_id: Number(iid), code },
               {
                 onSuccess: () => {
                   try {
@@ -91,13 +92,15 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
       if (event.data?.type !== "github-app-installed") return;
       if (handledRef.current) return;
       const installationId = event.data.installation_id as string | undefined;
+      const code = event.data.code as string | undefined;
       if (installationId) {
         handledRef.current = true;
         createGithubConnection.mutate(
-          { installation_id: Number(installationId) },
+          { installation_id: Number(installationId), code: code ?? "" },
           {
             onSuccess: () => {
               try {

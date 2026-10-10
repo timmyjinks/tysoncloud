@@ -123,3 +123,26 @@ func TestVerifyUserInstallationFailsClosed(t *testing.T) {
 		t.Fatalf("empty code err = %v, want ErrInstallationNotOwned", err)
 	}
 }
+
+func TestAcquireBuildSlotLimitsConcurrency(t *testing.T) {
+	s := NewService(config.Github{MaxConcurrentBuilds: 1}, config.Registry{})
+	noop := func(string) {}
+
+	release, err := s.acquireBuildSlot(context.Background(), noop)
+	if err != nil {
+		t.Fatalf("first slot: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := s.acquireBuildSlot(ctx, noop); !errors.Is(err, context.Canceled) {
+		t.Fatalf("second slot while full err = %v, want context.Canceled", err)
+	}
+
+	release()
+	release2, err := s.acquireBuildSlot(context.Background(), noop)
+	if err != nil {
+		t.Fatalf("slot after release: %v", err)
+	}
+	release2()
+}

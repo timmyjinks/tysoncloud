@@ -608,11 +608,6 @@ func (w *logWriter) Write(p []byte) (int, error) {
 			w.fn(line)
 		}
 	}
-	if len(s) > 0 && !strings.HasSuffix(s, "\n") && !strings.Contains(s, "\n") {
-		if w.fn != nil {
-			w.fn(strings.TrimRight(s, "\r\n"))
-		}
-	}
 	return n, nil
 }
 

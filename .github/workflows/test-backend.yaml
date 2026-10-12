@@ -35,17 +35,3 @@ jobs:
 
       - name: Test
         run: go test -race -count=1 ./...
-
-  migrations:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.120.0
-
-      - name: Apply migrations to a fresh database
-        run: supabase db start

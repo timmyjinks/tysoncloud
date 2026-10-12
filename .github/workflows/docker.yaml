@@ -8,7 +8,6 @@ on:
       - backend/**
       - frontend/**
       - infra/k8s/tc-system/**
-      - supabase/**
       - .github/workflows/docker.yaml
   workflow_dispatch:
 
@@ -134,27 +133,8 @@ jobs:
             type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache,mode=max
           provenance: false
 
-  migrate:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: 2.120.0
-
-      # Runs before update-manifests so Flux never rolls out code ahead of its schema.
-      - name: Apply migrations
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: supabase db push --db-url "$SUPABASE_DB_URL"
-
   update-manifests:
-    needs: [migrate, build-backend, build-frontend]
+    needs: [build-backend, build-frontend]
     runs-on: ubuntu-latest
     permissions:
       contents: write

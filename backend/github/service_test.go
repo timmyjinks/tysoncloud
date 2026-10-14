@@ -129,18 +129,6 @@ func TestVerifyUserInstallationFailsClosed(t *testing.T) {
 	}
 }
 
-func TestVerifyUserInstallationFailsClosed(t *testing.T) {
-	unconfigured := NewService(config.Github{}, config.Registry{})
-	if err := unconfigured.VerifyUserInstallation(context.Background(), "code", 1); err == nil {
-		t.Fatal("expected error when oauth client is not configured")
-	}
-
-	configured := NewService(config.Github{ClientID: "id", ClientSecret: "secret"}, config.Registry{})
-	if err := configured.VerifyUserInstallation(context.Background(), "", 1); !errors.Is(err, ErrInstallationNotOwned) {
-		t.Fatalf("empty code err = %v, want ErrInstallationNotOwned", err)
-	}
-}
-
 func TestAcquireBuildSlotLimitsConcurrency(t *testing.T) {
 	s := NewService(config.Github{MaxConcurrentBuilds: 1}, config.Registry{})
 	noop := func(string) {}

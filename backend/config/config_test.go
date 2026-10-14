@@ -22,8 +22,8 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Server.Addr != ":8080" {
 		t.Errorf("Addr = %q, want :8080", cfg.Server.Addr)
 	}
-	if cfg.Server.AllowedOrigins != "http://localhost:3000" {
-		t.Errorf("AllowedOrigins = %q", cfg.Server.AllowedOrigins)
+	if cfg.Server.AllowedOrigins != "" {
+		t.Errorf("AllowedOrigins = %q, want empty (server falls back to production origins)", cfg.Server.AllowedOrigins)
 	}
 	if cfg.Server.ClerkApiKey != "sk_test" || cfg.Supabase.ProjectURL != "https://supabase.example" || cfg.Supabase.APIKey != "anon" {
 		t.Errorf("required values not loaded: %+v", cfg)

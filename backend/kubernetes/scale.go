@@ -6,8 +6,8 @@ import (
 	"github.com/timmyjinks/tysoncloud/util"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v2 "k8s.io/client-go/applyconfigurations/autoscaling/v2"
 	appmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )

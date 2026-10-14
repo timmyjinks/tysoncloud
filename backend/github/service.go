@@ -158,10 +158,7 @@ func (s *Service) generateAppJWT() (string, error) {
 }
 
 func (s *Service) VerifyWebhookSignature(signature string, body []byte) bool {
-	if s.cfg.WebhookSecret == "" {
-		return true
-	}
-	if signature == "" {
+	if s.cfg.WebhookSecret == "" || signature == "" {
 		return false
 	}
 	hexSig := strings.TrimPrefix(signature, "sha256=")

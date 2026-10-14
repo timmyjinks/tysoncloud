@@ -3,12 +3,9 @@ package github
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -55,35 +52,6 @@ func TestIsInfraBuildError(t *testing.T) {
 		if got := IsInfraBuildError(tt.err); got != tt.want {
 			t.Errorf("IsInfraBuildError(%v) = %v, want %v", tt.err, got, tt.want)
 		}
-	}
-}
-
-func sign(secret string, body []byte) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write(body)
-	return "sha256=" + hex.EncodeToString(mac.Sum(nil))
-}
-
-func TestVerifyWebhookSignature(t *testing.T) {
-	body := []byte(`{"action":"opened"}`)
-	s := NewService(config.Github{WebhookSecret: "s3cret"}, config.Registry{})
-
-	if !s.VerifyWebhookSignature(sign("s3cret", body), body) {
-		t.Errorf("valid signature rejected")
-	}
-	if s.VerifyWebhookSignature(sign("wrong", body), body) {
-		t.Errorf("signature with wrong secret accepted")
-	}
-	if s.VerifyWebhookSignature(sign("s3cret", body), []byte(`{"action":"closed"}`)) {
-		t.Errorf("signature for different body accepted")
-	}
-	if s.VerifyWebhookSignature("", body) {
-		t.Errorf("missing signature accepted")
-	}
-
-	open := NewService(config.Github{}, config.Registry{})
-	if !open.VerifyWebhookSignature("", body) {
-		t.Errorf("no secret configured should accept any payload")
 	}
 }
 

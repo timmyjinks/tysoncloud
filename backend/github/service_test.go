@@ -108,4 +108,9 @@ func TestVerifyWebhookSignature(t *testing.T) {
 			}
 		})
 	}
+
+	s := NewService(config.Github{WebhookSecret: "s3cret"}, config.Registry{})
+	if s.VerifyWebhookSignature(valid, []byte(`{"zen":"tampered"}`)) {
+		t.Fatal("signature for a different body accepted")
+	}
 }

@@ -6,11 +6,12 @@ func setRequired(t *testing.T) {
 	t.Setenv("CLERK_API_KEY", "sk_test")
 	t.Setenv("SUPABASE_URL", "https://supabase.example")
 	t.Setenv("SUPABASE_API_KEY", "anon")
+	t.Setenv("GITHUB_WEBHOOK_SECRET", "whsec")
 }
 
 func TestLoadDefaults(t *testing.T) {
 	setRequired(t)
-	for _, k := range []string{"ADDR", "ALLOWED_ORIGINS", "CLUSTER_IP", "REGISTRY_URL", "KUBECONFIG", "GITHUB_WEBHOOK_SECRET"} {
+	for _, k := range []string{"ADDR", "ALLOWED_ORIGINS", "CLUSTER_IP", "REGISTRY_URL", "KUBECONFIG"} {
 		t.Setenv(k, "")
 	}
 
@@ -30,9 +31,6 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.Registry.URL == "" || cfg.KubeConfig == "" || cfg.Server.ClusterIp == "" {
 		t.Errorf("defaults missing: %+v", cfg)
 	}
-	if cfg.Github.WebhookSecret != "" {
-		t.Errorf("WebhookSecret = %q, want empty default", cfg.Github.WebhookSecret)
-	}
 }
 
 func TestLoadOverrides(t *testing.T) {
@@ -51,7 +49,7 @@ func TestLoadOverrides(t *testing.T) {
 }
 
 func TestLoadPanicsWithoutRequired(t *testing.T) {
-	for _, missing := range []string{"CLERK_API_KEY", "SUPABASE_URL", "SUPABASE_API_KEY"} {
+	for _, missing := range []string{"CLERK_API_KEY", "SUPABASE_URL", "SUPABASE_API_KEY", "GITHUB_WEBHOOK_SECRET"} {
 		t.Run(missing, func(t *testing.T) {
 			setRequired(t)
 			t.Setenv(missing, "")

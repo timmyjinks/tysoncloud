@@ -16,6 +16,17 @@ func (app *Application) GetVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	claims, ok := clerk.SessionClaimsFromContext(r.Context())
+	if !ok {
+		writeError(w, http.StatusUnauthorized, msgUnauthorized, nil)
+		return
+	}
+
+	if _, err := app.Supabase.GetService(serviceId, claims.Subject); err != nil {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+
 	volume, err := app.Supabase.GetVolume(serviceId)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "This service doesn't have a volume attached.", err)
@@ -65,13 +76,19 @@ func (app *Application) CreateVolume(w http.ResponseWriter, r *http.Request) {
 
 	userId := claims.Subject
 
+	service, err := app.Supabase.GetService(serviceId, userId)
+	if err != nil || service.ProjectId != projectId {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+
 	if _, err := app.Supabase.CreateVolume(serviceId, userId, volume.MountPath, volume.StorageGB); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't attach the volume.", err)
 		return
 	}
 
 	if err := app.Deploy.AttachVolume(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + service.ProjectId,
 		Name:      "svc-" + serviceId,
 	}, deploy.Volume{
 		MountPath: volume.MountPath,
@@ -103,13 +120,19 @@ func (app *Application) DeleteVolume(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	service, err := app.Supabase.GetService(serviceId, claims.Subject)
+	if err != nil || service.ProjectId != projectId {
+		writeError(w, http.StatusNotFound, "We couldn't find that service.", err)
+		return
+	}
+
 	if err := app.Supabase.DeleteVolume(serviceId, claims.Subject); err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't detach the volume.", err)
 		return
 	}
 
 	if err := app.Deploy.DetachVolume(r.Context(), deploy.Service{
-		Namespace: "proj-" + projectId,
+		Namespace: "proj-" + service.ProjectId,
 		Name:      "svc-" + serviceId,
 	}); err != nil {
 		writeError(w, http.StatusInternalServerError, "Your volume was removed, but we couldn't detach it from your running service. A refresh will show its current status.", err)

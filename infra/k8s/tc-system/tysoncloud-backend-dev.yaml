@@ -105,6 +105,18 @@ spec:
                   key: GITHUB_APP_PRIVATE_KEY
                   name: tysoncloud-backend-dev
                   optional: true
+            - name: GITHUB_APP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  key: GITHUB_APP_CLIENT_ID
+                  name: tysoncloud-backend-dev
+                  optional: true
+            - name: GITHUB_APP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: GITHUB_APP_CLIENT_SECRET
+                  name: tysoncloud-backend-dev
+                  optional: true
         - name: buildkitd
           image: moby/buildkit:latest
           args:

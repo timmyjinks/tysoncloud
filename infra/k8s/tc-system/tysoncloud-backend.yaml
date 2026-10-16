@@ -53,7 +53,7 @@ spec:
       serviceAccountName: tysoncloud-backend
       containers:
         - name: tysoncloud-backend
-          image: ghcr.io/timmyjinks/tysoncloud-backend:sha-70879c4c9f83425e63bf59d8e0e9b6e6e6f5db60
+          image: ghcr.io/timmyjinks/tysoncloud-backend:sha-3be3f97cb4217ef4cdb22ef64f781a3edceba6d0
           ports:
             - containerPort: 8080
           env:

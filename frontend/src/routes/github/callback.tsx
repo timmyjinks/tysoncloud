@@ -8,7 +8,12 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/github/callback")({
   validateSearch: (search: Record<string, unknown>) => ({
-    installation_id: typeof search.installation_id === "string" ? search.installation_id : undefined,
+    // TanStack's default search parser JSON-parses values, so a numeric
+    // installation_id arrives as a number, not a string.
+    installation_id:
+      typeof search.installation_id === "number" || typeof search.installation_id === "string"
+        ? String(search.installation_id)
+        : undefined,
     setup_action: typeof search.setup_action === "string" ? search.setup_action : undefined,
     state: typeof search.state === "string" ? search.state : undefined,
   }),

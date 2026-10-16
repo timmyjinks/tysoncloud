@@ -118,19 +118,18 @@ spec:
                   name: tysoncloud-backend-dev
                   optional: true
         - name: buildkitd
-          image: moby/buildkit:latest
+          # Pinned to match the buildctl client in backend/cmd/deploy/Dockerfile.
+          image: moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e
           args:
+            # Loopback only: the API container shares the pod network
+            # namespace, nothing else in the cluster can reach buildkitd.
             - --addr
-            - tcp://0.0.0.0:1234
+            - tcp://127.0.0.1:1234
             - --addr
             - unix:///run/buildkit/buildkitd.sock
-          ports:
-            - containerPort: 1234
-              name: buildkit
-              protocol: TCP
           readinessProbe:
-            tcpSocket:
-              port: 1234
+            exec:
+              command: ["buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers"]
             initialDelaySeconds: 5
             periodSeconds: 5
           securityContext:

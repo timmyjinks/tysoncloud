@@ -17,7 +17,7 @@ spec:
       serviceAccountName: tysoncloud-status
       containers:
         - name: tysoncloud-status
-          image: timmijinks/tysoncloud-status
+          image: timmijinks/tysoncloud-status@sha256:e9be266a8993d7cd01721f107a4deb80a27c4d9b4e75e3e2c9ea3a864e3818fb
           ports:
             - containerPort: 8080
           env:

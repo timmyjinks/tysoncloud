@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/github/callback")({
   validateSearch: (search: Record<string, unknown>) => ({
-    // TanStack's default search parser JSON-parses values, so a numeric
-    // installation_id arrives as a number, not a string.
+    // TanStack's default search parser JSON-parses values, so installation_id
+    // arrives as a number. Keep it one: returning a string makes the router
+    // re-serialize it as installation_id=%22123%22 and rewrite the URL.
     installation_id:
-      typeof search.installation_id === "number" || typeof search.installation_id === "string"
-        ? String(search.installation_id)
-        : undefined,
+      typeof search.installation_id === "number"
+        ? search.installation_id
+        : typeof search.installation_id === "string" && /^\d+$/.test(search.installation_id)
+          ? Number(search.installation_id)
+          : undefined,
     setup_action: typeof search.setup_action === "string" ? search.setup_action : undefined,
     state: typeof search.state === "string" ? search.state : undefined,
   }),
@@ -54,7 +57,7 @@ function GithubCallbackPage() {
     } catch {}
   };
 
-  const notifyOpener = (installationId: string) => {
+  const notifyOpener = (installationId: number) => {
     try {
       if (hasOpener()) {
         window.opener.postMessage(

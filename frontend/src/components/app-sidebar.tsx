@@ -65,7 +65,8 @@ export function AppSidebar({ activeProjectId }: AppSidebarProps) {
             handledRef.current = true;
             window.clearInterval(timer);
             createGithubConnection.mutate(
-              { installation_id: Number(iid) },
+              // Tolerate a JSON-quoted value (installation_id=%22123%22).
+              { installation_id: Number(iid.replace(/"/g, "")) },
               {
                 onSuccess: () => {
                   try {

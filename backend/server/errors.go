@@ -140,4 +140,3 @@ func domainValidationMessage(err error) string {
 	}
 	return "Custom domain must be 1-63 characters, lowercase letters, numbers, and hyphens only, and cannot start or end with a hyphen."
 }
-

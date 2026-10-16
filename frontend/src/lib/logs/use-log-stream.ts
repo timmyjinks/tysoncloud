@@ -40,8 +40,9 @@ function useGenericLogStream(wsPath: string, enabled: boolean, deps: unknown[]) 
     async function connect() {
       setStatus("connecting");
       const token = await (window as any).Clerk?.session?.getToken();
-      const url = wsUrl(`${wsPath}?token=${token}`);
-      const ws = new WebSocket(url);
+      // Token travels in Sec-WebSocket-Protocol, not the URL, so it never
+      // lands in proxy access logs or browser history.
+      const ws = new WebSocket(wsUrl(wsPath), token ? ["bearer", token] : undefined);
       wsRef.current = ws;
 
       ws.onopen = () => {

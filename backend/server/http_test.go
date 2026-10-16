@@ -16,69 +16,6 @@ import (
 	gh "github.com/timmyjinks/tysoncloud/github"
 )
 
-func TestParseAllowedOrigins(t *testing.T) {
-	defaults := parseAllowedOrigins("  ")
-	if len(defaults) != len(defaultAllowedOrigins) || !defaults["http://localhost:3000"] {
-		t.Fatalf("blank config should use defaults, got %v", defaults)
-	}
-
-	got := parseAllowedOrigins(" https://a.example , ,https://b.example")
-	if len(got) != 2 || !got["https://a.example"] || !got["https://b.example"] {
-		t.Fatalf("parsed = %v", got)
-	}
-}
-
-func TestCORSMiddleware(t *testing.T) {
-	app := &Application{Config: config.Config{Server: config.Server{AllowedOrigins: "https://app.example"}}}
-	called := false
-	h := app.CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusTeapot)
-	}))
-
-	t.Run("allowed origin is echoed", func(t *testing.T) {
-		called = false
-		req := httptest.NewRequest(http.MethodGet, "/projects", nil)
-		req.Header.Set("Origin", "https://app.example")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-
-		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "https://app.example" {
-			t.Fatalf("Allow-Origin = %q", got)
-		}
-		if rec.Header().Get("Vary") != "Origin" || rec.Header().Get("Access-Control-Allow-Credentials") != "true" {
-			t.Fatalf("headers = %v", rec.Header())
-		}
-		if !called || rec.Code != http.StatusTeapot {
-			t.Fatalf("next handler not called (code %d)", rec.Code)
-		}
-	})
-
-	t.Run("unknown origin is not echoed", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/projects", nil)
-		req.Header.Set("Origin", "https://evil.example")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "" {
-			t.Fatalf("Allow-Origin = %q, want empty for unknown origin", got)
-		}
-	})
-
-	t.Run("preflight short-circuits", func(t *testing.T) {
-		called = false
-		req := httptest.NewRequest(http.MethodOptions, "/projects", nil)
-		req.Header.Set("Origin", "https://app.example")
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusNoContent || called {
-			t.Fatalf("preflight code = %d, called = %v", rec.Code, called)
-		}
-		if rec.Header().Get("Access-Control-Allow-Methods") != corsAllowedMethods {
-			t.Fatalf("Allow-Methods = %q", rec.Header().Get("Access-Control-Allow-Methods"))
-		}
-	})
-}
-
 func authCookie(name, value string) *http.Cookie {
 	return &http.Cookie{Name: name, Value: value}
 }

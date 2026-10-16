@@ -29,10 +29,13 @@ func Mount(app *Application) http.Handler {
 
 func (app *Application) Start(mux http.Handler) error {
 	server := &http.Server{
-		Addr:        app.Config.Server.Addr,
-		Handler:     mux,
-		ReadTimeout: 90 * time.Second,
-		IdleTimeout: 90 * time.Second,
+		Addr:              app.Config.Server.Addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       90 * time.Second,
+		IdleTimeout:       90 * time.Second,
+		// No WriteTimeout: it would cut off long-lived log WebSockets, which
+		// set per-message write deadlines instead.
 	}
 
 	fmt.Printf("Server running on http://localhost%s\n", app.Config.Server.Addr)

@@ -231,6 +231,28 @@ func (s *SupabaseStore) updateGithubServiceStatusDirect(id, status string) (Gith
 	return single, nil
 }
 
+// RelinkGithubServices points the user's detached github_services (whose
+// connection was removed by an app uninstall) at connectionId.
+func (s *SupabaseStore) RelinkGithubServices(userId, connectionId string) error {
+	projects, err := s.GetProjects(userId)
+	if err != nil {
+		return err
+	}
+	if len(projects) == 0 {
+		return nil
+	}
+	projectIds := make([]string, len(projects))
+	for i, p := range projects {
+		projectIds[i] = p.Id
+	}
+	_, _, err = s.cli.From("github_services").
+		Update(map[string]interface{}{"github_connection_id": connectionId}, "", "").
+		Is("github_connection_id", "null").
+		In("project_id", projectIds).
+		Execute()
+	return err
+}
+
 func (s *SupabaseStore) DeleteGithubService(id, userId string) error {
 	result := s.cli.Rpc("delete_github_service", "", map[string]interface{}{
 		"p_id":      id,

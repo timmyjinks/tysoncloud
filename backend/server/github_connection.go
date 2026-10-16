@@ -50,7 +50,11 @@ func (app *Application) CreateGithubConnection(w http.ResponseWriter, r *http.Re
 			_ = json.NewEncoder(w).Encode(existing)
 			return
 		}
-		_ = app.Supabase.DeleteGithubConnection(existing.Id, claims.Subject)
+		if err := app.Supabase.DeleteGithubConnection(existing.Id, claims.Subject); err != nil {
+			slog.Error("CreateGithubConnection: delete previous connection failed", "user_id", claims.Subject, "connection_id", existing.Id, "err", err)
+			writeError(w, http.StatusInternalServerError, "Couldn't replace the existing GitHub connection.", err)
+			return
+		}
 	}
 
 	if err := app.Supabase.CreateGithubConnection(claims.Subject, req.InstallationId); err != nil {
@@ -65,6 +69,11 @@ func (app *Application) CreateGithubConnection(w http.ResponseWriter, r *http.Re
 		slog.Error("GetGithubConnection after create failed", "user_id", claims.Subject, "err", err)
 		writeError(w, http.StatusInternalServerError, "GitHub connection was saved, but we couldn't confirm it. Please refresh.", err)
 		return
+	}
+
+	// Services detached by an earlier uninstall resume push builds once relinked.
+	if err := app.Supabase.RelinkGithubServices(claims.Subject, conn.Id); err != nil {
+		slog.Error("CreateGithubConnection: relink detached services failed", "user_id", claims.Subject, "connection_id", conn.Id, "err", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

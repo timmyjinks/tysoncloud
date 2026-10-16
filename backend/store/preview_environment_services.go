@@ -257,6 +257,9 @@ func (s *SupabaseStore) EnsureServiceCopy(ownerId string, src ServicesTable, prN
 }
 
 func (s *SupabaseStore) EnsureGithubServiceCopy(ownerId string, src GithubServicesTable, prNumber int) (GithubServicesTable, error) {
+	if src.GithubConnectionId == "" {
+		return GithubServicesTable{}, fmt.Errorf("github service %s is detached from its GitHub connection", src.Id)
+	}
 	name := PreviewCopyName(src.Name, prNumber)
 	if all, err := s.GetGithubServicesByProjectId(src.ProjectId); err == nil {
 		for _, g := range all {

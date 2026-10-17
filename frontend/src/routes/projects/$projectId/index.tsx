@@ -38,7 +38,7 @@ import {
   PreviewServiceEditDialog,
   type PreviewEditTarget,
 } from "@/components/preview-service-edit-dialog";
-import { SERVICE_RESOURCE_LIMITS } from "@/lib/resource-limits";
+import { SERVICE_RESOURCE_SUMMARY } from "@/lib/resource-limits";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Service, Database, GithubService } from "@/lib/api/types";
 
@@ -443,7 +443,7 @@ function ProjectDetail() {
                   name={resource.data.name}
                   status={resource.data.status}
                   runtime={resource.data.image}
-                  subtitle={`${SERVICE_RESOURCE_LIMITS.cpu} · ${SERVICE_RESOURCE_LIMITS.memory}`}
+                  subtitle={SERVICE_RESOURCE_SUMMARY}
                   size={`:${resource.data.port}`}
                   domain={resource.data.public_domain}
                   domainHref={
@@ -470,7 +470,7 @@ function ProjectDetail() {
                   name={resource.data.name}
                   status={resource.data.status}
                   runtime={resource.data.repo_name}
-                  subtitle={`root:${resource.data.root_dir} · ${SERVICE_RESOURCE_LIMITS.cpu} · ${SERVICE_RESOURCE_LIMITS.memory}`}
+                  subtitle={`root:${resource.data.root_dir} · ${SERVICE_RESOURCE_SUMMARY}`}
                   size={`:${resource.data.port}`}
                   domain={resource.data.public_domain}
                   domainHref={

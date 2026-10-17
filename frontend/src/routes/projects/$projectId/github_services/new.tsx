@@ -351,8 +351,8 @@ function NewGithubServicePage() {
       </div>
 
       <p className="text-xs text-[var(--color-text-muted)]">
-        Each service runs with a maximum of <code className="font-mono">{SERVICE_RESOURCE_LIMITS.cpu}</code> and{" "}
-        <code className="font-mono">{SERVICE_RESOURCE_LIMITS.memory}</code> memory. Pushes to the branch will auto-redeploy.
+        Each instance gets up to <code className="font-mono">{SERVICE_RESOURCE_LIMITS.cpu}</code> and{" "}
+        <code className="font-mono">{SERVICE_RESOURCE_LIMITS.memory}</code> of memory. Pushes to the branch will auto-redeploy.
       </p>
 
 

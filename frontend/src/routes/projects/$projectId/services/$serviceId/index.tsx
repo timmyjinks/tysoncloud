@@ -155,8 +155,8 @@ function ServiceDetail() {
               },
               { label: "Port", value: String(previewEntry.port), mono: true },
               { label: "PR", value: `#${previewEntry.pr}`, mono: true, href: previewEntry.pr_url || undefined },
-              { label: "Max CPU", value: SERVICE_RESOURCE_LIMITS.cpu, mono: true },
-              { label: "Max memory", value: SERVICE_RESOURCE_LIMITS.memory, mono: true },
+              { label: "CPU per instance", value: SERVICE_RESOURCE_LIMITS.cpu, mono: true },
+              { label: "Memory per instance", value: SERVICE_RESOURCE_LIMITS.memory, mono: true },
             ]}
           />
         </div>
@@ -325,8 +325,8 @@ function ServiceDetail() {
             },
             { label: "Image", value: service.image, mono: true, copyable: true },
             { label: "Port", value: String(service.port), mono: true },
-            { label: "Max CPU", value: SERVICE_RESOURCE_LIMITS.cpu, mono: true },
-            { label: "Max memory", value: SERVICE_RESOURCE_LIMITS.memory, mono: true },
+            { label: "CPU per instance", value: SERVICE_RESOURCE_LIMITS.cpu, mono: true },
+            { label: "Memory per instance", value: SERVICE_RESOURCE_LIMITS.memory, mono: true },
           ]}
         />
       </div>

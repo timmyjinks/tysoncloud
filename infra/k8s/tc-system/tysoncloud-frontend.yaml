@@ -52,7 +52,7 @@ spec:
     spec:
       containers:
         - name: tysoncloud-frontend
-          image: ghcr.io/timmyjinks/tysoncloud-frontend:sha-1cd62047fce0cb1fe0a4c3d923d497a89463df0a
+          image: ghcr.io/timmyjinks/tysoncloud-frontend:sha-c54b0d59f7c6b75601c8761f5cda18006b316014
           ports:
             - containerPort: 3000
           env:

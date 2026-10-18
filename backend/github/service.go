@@ -287,22 +287,75 @@ func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, root
 
 var envKeyRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
+// railpackEnvArgs passes only env names to `railpack prepare`; railpack reads
+// each value from the process environment (see exportEnv), so secret values
+// never appear on argv where any process on the node can read them.
 func railpackEnvArgs(env map[string][]byte) []string {
-	if len(env) == 0 {
+	keys := railpackEnvKeys(env)
+	if len(keys) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(env))
-	for k := range env {
-		if envKeyRegex.MatchString(k) {
-			keys = append(keys, k)
-		}
-	}
-	sort.Strings(keys)
 	args := make([]string, 0, len(keys)*2)
 	for _, k := range keys {
-		args = append(args, "--env", k+"="+string(env[k]))
+		args = append(args, "--env", k)
 	}
 	return args
+}
+
+// railpackFrontendImage is the BuildKit frontend that executes railpack plans.
+// Keep its version in sync with RAILPACK_VERSION in cmd/deploy/Dockerfile.
+const railpackFrontendImage = "ghcr.io/railwayapp/railpack-frontend:v0.40.1@sha256:f1973377693af30c9b37a92c97c661c07b277ccdc6be909213c74c771f8d2d6d"
+
+// minScrubbedSecretLen skips very short values (e.g. PORT=80, DEBUG=1) that
+// would otherwise mask unrelated log text.
+const minScrubbedSecretLen = 6
+
+// newSecretScrubber returns a function that masks env values in build output
+// before it reaches user-visible build logs or server logs.
+// Output is scrubbed line by line, so multi-line values (e.g. PEM keys) are
+// also matched per line, and longer values are matched before shorter ones
+// so a secret that contains another isn't only partially masked.
+func newSecretScrubber(env map[string][]byte) func(string) string {
+	type secret struct{ value, key string }
+	var secrets []secret
+	for _, k := range railpackEnvKeys(env) {
+		v := string(env[k])
+		if len(v) >= minScrubbedSecretLen {
+			secrets = append(secrets, secret{v, k})
+		}
+		if strings.ContainsAny(v, "\r\n") {
+			for _, line := range strings.FieldsFunc(v, func(r rune) bool { return r == '\n' || r == '\r' }) {
+				if line = strings.TrimSpace(line); len(line) >= minScrubbedSecretLen {
+					secrets = append(secrets, secret{line, k})
+				}
+			}
+		}
+	}
+	if len(secrets) == 0 {
+		return func(s string) string { return s }
+	}
+	sort.SliceStable(secrets, func(i, j int) bool { return len(secrets[i].value) > len(secrets[j].value) })
+	pairs := make([]string, 0, len(secrets)*2)
+	for _, sec := range secrets {
+		pairs = append(pairs, sec.value, "[redacted:"+sec.key+"]")
+	}
+	return strings.NewReplacer(pairs...).Replace
+}
+
+// reservedBuildEnvKeys are process variables of the backend container that a
+// tenant's service env must not override for the railpack/buildctl processes
+// (e.g. redirecting their traffic through a proxy or swapping binaries).
+var reservedBuildEnvKeys = map[string]bool{
+	"PATH": true, "HOME": true, "USER": true, "SHELL": true, "TMPDIR": true,
+	"LD_PRELOAD": true, "LD_LIBRARY_PATH": true,
+	"HTTP_PROXY": true, "HTTPS_PROXY": true, "NO_PROXY": true, "ALL_PROXY": true,
+	"SSL_CERT_FILE": true, "SSL_CERT_DIR": true,
+	"BUILDKIT_HOST": true,
+}
+
+func isReservedBuildEnvKey(k string) bool {
+	u := strings.ToUpper(k)
+	return reservedBuildEnvKeys[u] || strings.HasPrefix(u, "BUILDKIT_") || strings.HasPrefix(u, "DOCKER_") || strings.HasPrefix(u, "GIT_")
 }
 
 func railpackEnvKeys(env map[string][]byte) []string {
@@ -311,7 +364,7 @@ func railpackEnvKeys(env map[string][]byte) []string {
 	}
 	keys := make([]string, 0, len(env))
 	for k := range env {
-		if envKeyRegex.MatchString(k) {
+		if envKeyRegex.MatchString(k) && !isReservedBuildEnvKey(k) {
 			keys = append(keys, k)
 		}
 	}
@@ -652,6 +705,12 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 	defer os.RemoveAll(planDir)
 	planPath := filepath.Join(planDir, "railpack-plan.json")
 
+	scrub := newSecretScrubber(env)
+	if logFn != nil {
+		rawLogFn := logFn
+		logFn = func(line string) { rawLogFn(scrub(line)) }
+	}
+
 	envArgs := railpackEnvArgs(env)
 	if keys := railpackEnvKeys(env); len(keys) > 0 {
 		msg := fmt.Sprintf("[state] building: railpack env_keys=%d [%s]", len(keys), strings.Join(keys, ","))
@@ -662,9 +721,9 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 	}
 	prepArgs := append([]string{"prepare", buildContext, "--plan-out", planPath}, envArgs...)
 	prepCmd := exec.CommandContext(ctx, "railpack", prepArgs...)
-	prepCmd.Env = os.Environ()
+	prepCmd.Env = exportEnv(os.Environ(), env)
 	if out, err := runCmdWithLogs(prepCmd, logFn); err != nil {
-		slog.Error("railpack prepare failed", "err", err, "output", out)
+		slog.Error("railpack prepare failed", "err", err, "output", scrub(out))
 		return "", fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
@@ -673,7 +732,7 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		"--local", "context=" + buildContext,
 		"--local", "dockerfile=" + planDir,
 		"--frontend=gateway.v0",
-		"--opt", "source=ghcr.io/railwayapp/railpack-frontend:latest",
+		"--opt", "source=" + railpackFrontendImage,
 	}
 	if secretArgs := buildctlSecretArgs(env); len(secretArgs) > 0 {
 		buildArgs = append(buildArgs, secretArgs...)
@@ -694,7 +753,7 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		}
 	}
 	if out, err := runCmdWithLogs(buildCmd, logFn); err != nil {
-		slog.Error("buildctl build failed", "err", err, "output", out)
+		slog.Error("buildctl build failed", "err", err, "output", scrub(out))
 		return "", fmt.Errorf("buildctl build failed: %w", err)
 	}
 	return imageTag, nil

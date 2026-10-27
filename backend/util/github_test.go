@@ -31,3 +31,25 @@ func TestGithubCloneURL(t *testing.T) {
 		})
 	}
 }
+
+func TestIsForkPR(t *testing.T) {
+	tests := []struct {
+		name     string
+		headRepo string
+		baseRepo string
+		want     bool
+	}{
+		{name: "same repo", headRepo: "timmyjinks/tysoncloud", baseRepo: "timmyjinks/tysoncloud", want: false},
+		{name: "same repo different case", headRepo: "TimmyJinks/TysonCloud", baseRepo: "timmyjinks/tysoncloud", want: false},
+		{name: "fork", headRepo: "attacker/tysoncloud", baseRepo: "timmyjinks/tysoncloud", want: true},
+		{name: "unknown base fails closed", headRepo: "attacker/tysoncloud", baseRepo: "", want: true},
+		{name: "both unknown fails closed", headRepo: "", baseRepo: "", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsForkPR(tt.headRepo, tt.baseRepo); got != tt.want {
+				t.Fatalf("IsForkPR(%q, %q) = %v, want %v", tt.headRepo, tt.baseRepo, got, tt.want)
+			}
+		})
+	}
+}

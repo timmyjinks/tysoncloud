@@ -390,6 +390,16 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		if headRepo == "" {
 			headRepo = payload.Repository.FullName
 		}
+		if util.IsForkPR(headRepo, payload.Repository.FullName) {
+			slog.Warn("preview deploy: skipping fork PR", "repo_id", payload.Repository.Id, "head_repo", headRepo, "pr", payload.Number)
+			if token, _ := app.Github.GetInstallationToken(r.Context(), installationId); token != "" {
+				bg, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				app.postPreviewForkNotice(bg, token, payload.Repository.FullName, payload.Repository.Id, payload.Number)
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 		headCloneURL, err := util.GithubCloneURL(headRepo)
 		if err != nil {
 			slog.Warn("preview deploy: invalid head repo", "repo_id", payload.Repository.Id, "head_repo", headRepo, "err", err)
@@ -513,6 +523,11 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 		cheadSHA, cheadRef, cheadRepo := app.fetchPRHead(r.Context(), ctoken, cpayload.Repository.FullName, cpayload.Issue.Number)
 		if cheadRepo == "" {
 			cheadRepo = cpayload.Repository.FullName
+		}
+		if util.IsForkPR(cheadRepo, cpayload.Repository.FullName) {
+			slog.Warn("preview retry: skipping fork PR", "repo_id", cpayload.Repository.Id, "head_repo", cheadRepo, "pr", cpayload.Issue.Number)
+			w.WriteHeader(http.StatusOK)
+			return
 		}
 		cheadCloneURL, cerr := util.GithubCloneURL(cheadRepo)
 		if cerr != nil {
@@ -666,6 +681,10 @@ func renderPreviewUnlinkedComment(marker string, repoFullName string, prNumber i
 	return fmt.Sprintf("%s\n## TYSONCLOUD preview — PR #%d\n\nThis repo is not associated with any TYSONCLOUD project, so no preview was created. Create a GitHub service for this repo in a project to enable previews.%s", marker, prNumber, previewRetryBox)
 }
 
+func renderPreviewForkComment(marker string, prNumber int) string {
+	return fmt.Sprintf("%s\n## TYSONCLOUD preview — PR #%d\n\nThis PR comes from a fork, so no preview was created. Previews build with the project's environment variables, which are never shared with fork PRs. Push the branch to this repository to get a preview.", marker, prNumber)
+}
+
 func renderPreviewTornDownComment(marker string, prNumber int) string {
 	return fmt.Sprintf("%s\n## TYSONCLOUD preview — PR #%d\n\nPreview environment(s) for PR #%d have been torn down.", marker, prNumber, prNumber)
 }
@@ -765,6 +784,19 @@ func (app *Application) patchPreviewMainComment(ctx context.Context, token, repo
 }
 
 func (app *Application) postPreviewNoticeAsMain(ctx context.Context, token, repoFullName string, repoId int64, prNumber int) {
+	app.postPreviewNotice(ctx, token, repoFullName, repoId, prNumber, "unlinked", func(marker string) string {
+		return renderPreviewUnlinkedComment(marker, repoFullName, prNumber)
+	})
+}
+
+func (app *Application) postPreviewForkNotice(ctx context.Context, token, repoFullName string, repoId int64, prNumber int) {
+	app.postPreviewNotice(ctx, token, repoFullName, repoId, prNumber, "fork", func(marker string) string {
+		return renderPreviewForkComment(marker, prNumber)
+	})
+}
+
+// postPreviewNotice posts a one-off main comment unless one already exists.
+func (app *Application) postPreviewNotice(ctx context.Context, token, repoFullName string, repoId int64, prNumber int, kind string, render func(marker string) string) {
 	if token == "" || repoFullName == "" {
 		return
 	}
@@ -775,9 +807,8 @@ func (app *Application) postPreviewNoticeAsMain(ctx context.Context, token, repo
 	if id := app.Github.FindPRCommentByMarker(ctx, token, repoFullName, prNumber, marker); id != 0 {
 		return
 	}
-	body := renderPreviewUnlinkedComment(marker, repoFullName, prNumber)
-	if _, err := app.Github.PostPRComment(ctx, token, repoFullName, prNumber, body); err != nil {
-		slog.Warn("preview: failed to post unlinked notice", "repo", repoFullName, "pr", prNumber, "err", err)
+	if _, err := app.Github.PostPRComment(ctx, token, repoFullName, prNumber, render(marker)); err != nil {
+		slog.Warn("preview: failed to post "+kind+" notice", "repo", repoFullName, "pr", prNumber, "err", err)
 	}
 }
 

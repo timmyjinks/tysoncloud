@@ -43,9 +43,10 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 					ContainerPort: &resource.Port,
 				},
 			},
-			// Tenant images are arbitrary, so root and the default
-			// capability set are still allowed (many images chown/setuid at
-			// start), but escalation, raw sockets and device creation are not.
+			// The pod runs in its own user namespace (HostUsers below), so
+			// root and the default capability set only apply inside it.
+			// They stay allowed because many images chown/setuid at start;
+			// escalation, raw sockets and device creation are still not.
 			SecurityContext: &appcorev1.SecurityContextApplyConfiguration{
 				AllowPrivilegeEscalation: util.BoolPtr(false),
 				Privileged:               util.BoolPtr(false),
@@ -96,6 +97,22 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 				Containers: container,
 				// Tenant workloads never need to talk to the Kubernetes API.
 				AutomountServiceAccountToken: util.BoolPtr(false),
+				// Tenant images are arbitrary and most expect to start as
+				// root, so instead of forcing a UID (which breaks stock
+				// images like nginx) give each pod its own user namespace:
+				// container UIDs, root included, map to an unused,
+				// unprivileged UID range on the node.
+				HostUsers: util.BoolPtr(false),
+				// Lets images that set a non-root USER still listen on :80.
+				// Scoped to the pod's own network namespace.
+				SecurityContext: &appcorev1.PodSecurityContextApplyConfiguration{
+					Sysctls: []appcorev1.SysctlApplyConfiguration{
+						{
+							Name:  util.StringPtr("net.ipv4.ip_unprivileged_port_start"),
+							Value: util.StringPtr("0"),
+						},
+					},
+				},
 			},
 		},
 	}

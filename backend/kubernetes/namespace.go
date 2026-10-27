@@ -21,7 +21,8 @@ func (d *KubernetesService) CreateNamespace(ctx context.Context, namespace strin
 				"managed-by": "tysoncloud",
 				// Pod Security Admission: block privileged/host-level pods
 				// in tenant namespaces, and surface anything that misses
-				// the stricter "restricted" profile.
+				// the stricter "restricted" profile. Tenant pods run as
+				// root inside a user namespace, which "restricted" rejects.
 				"pod-security.kubernetes.io/enforce": "baseline",
 				"pod-security.kubernetes.io/warn":    "restricted",
 				"pod-security.kubernetes.io/audit":   "restricted",

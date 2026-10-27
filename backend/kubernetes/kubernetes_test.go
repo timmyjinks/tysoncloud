@@ -3,12 +3,14 @@ package kubernetes
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -220,6 +222,33 @@ func TestCreateNetworkPolicy(t *testing.T) {
 	}
 	if got := main.Spec.Ingress[0].From[1].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"]; got != "tc-system" {
 		t.Fatalf("ingress namespace = %q, want tc-system", got)
+	}
+
+	// The public-internet egress rule (80/443) must be constrained to an
+	// IPBlock that excludes link-local and RFC1918, so tenants can't reach
+	// the metadata endpoint, the API server or other in-cluster Services.
+	var publicEgress *netv1.NetworkPolicyEgressRule
+	for i := range main.Spec.Egress {
+		e := &main.Spec.Egress[i]
+		for _, p := range e.Ports {
+			if p.Port != nil && p.Port.IntVal == 443 {
+				publicEgress = e
+			}
+		}
+	}
+	if publicEgress == nil {
+		t.Fatal("no egress rule allowing 443")
+	}
+	if len(publicEgress.To) != 1 || publicEgress.To[0].IPBlock == nil {
+		t.Fatalf("public egress is not restricted to an IPBlock: %+v", publicEgress.To)
+	}
+	if publicEgress.To[0].IPBlock.CIDR != "0.0.0.0/0" {
+		t.Fatalf("public egress CIDR = %q, want 0.0.0.0/0", publicEgress.To[0].IPBlock.CIDR)
+	}
+	for _, want := range []string{"169.254.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"} {
+		if !slices.Contains(publicEgress.To[0].IPBlock.Except, want) {
+			t.Fatalf("public egress except %v missing %s", publicEgress.To[0].IPBlock.Except, want)
+		}
 	}
 
 	db, err := cs.NetworkingV1().NetworkPolicies(testNS).Get(ctx, testNS+"-database", metav1.GetOptions{})

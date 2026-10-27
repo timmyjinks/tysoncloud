@@ -22,6 +22,7 @@ type Server struct {
 	AllowedOrigins string `env:"ALLOWED_ORIGINS"`
 	ClerkApiKey    string `env:"CLERK_API_KEY"`
 	ClusterIp      string `env:"CLUSTER_IP"`
+	MaxProjects    int    `env:"MAX_PROJECTS"`
 }
 
 type Github struct {
@@ -55,6 +56,7 @@ func Load() (Config, error) {
 			AllowedOrigins: getString("ALLOWED_ORIGINS", ""),
 			ClerkApiKey:    getStringOrDie("CLERK_API_KEY"),
 			ClusterIp:      getString("CLUSTER_IP", "192.168.0.18"),
+			MaxProjects:    getInt("MAX_PROJECTS", 10),
 		},
 		Supabase: Supabase{
 			ProjectURL: getStringOrDie("SUPABASE_URL"),

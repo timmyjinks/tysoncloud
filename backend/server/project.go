@@ -80,6 +80,17 @@ func (app *Application) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	existing, err := app.Supabase.GetProjects(claims.Subject)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Couldn't create the project.", err)
+		return
+	}
+	maxProjects := app.Config.Server.MaxProjects
+	if len(existing) >= maxProjects {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("You've reached the limit of %d projects. Delete one to create another.", maxProjects), nil)
+		return
+	}
+
 	res, err := app.Supabase.CreateProject(claims.Subject, project.Name)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't create the project.", err)

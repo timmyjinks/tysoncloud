@@ -16,10 +16,6 @@ import (
 	"github.com/timmyjinks/tysoncloud/store"
 )
 
-// maxProjectsPerUser bounds how many projects (and therefore namespaces,
-// each with its own quota) a single account can create.
-const maxProjectsPerUser = 10
-
 func (app *Application) GetProject(w http.ResponseWriter, r *http.Request) {
 	projectId := mux.Vars(r)["project_id"]
 	if projectId == "" {
@@ -84,17 +80,14 @@ func (app *Application) CreateProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Each project is its own namespace with its own ResourceQuota, so the
-	// per-namespace quota alone doesn't bound what one user can request
-	// across the cluster. Cap projects per user to keep a single account
-	// from exhausting cluster capacity by creating namespaces in a loop.
 	existing, err := app.Supabase.GetProjects(claims.Subject)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Couldn't create the project.", err)
 		return
 	}
-	if len(existing) >= maxProjectsPerUser {
-		writeError(w, http.StatusForbidden, fmt.Sprintf("You've reached the limit of %d projects. Delete one to create another.", maxProjectsPerUser), nil)
+	maxProjects := app.Config.Server.MaxProjects
+	if len(existing) >= maxProjects {
+		writeError(w, http.StatusForbidden, fmt.Sprintf("You've reached the limit of %d projects. Delete one to create another.", maxProjects), nil)
 		return
 	}
 

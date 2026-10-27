@@ -43,6 +43,7 @@ func TestIsForkPR(t *testing.T) {
 		{name: "same repo different case", headRepo: "TimmyJinks/TysonCloud", baseRepo: "timmyjinks/tysoncloud", want: false},
 		{name: "fork", headRepo: "attacker/tysoncloud", baseRepo: "timmyjinks/tysoncloud", want: true},
 		{name: "unknown base fails closed", headRepo: "attacker/tysoncloud", baseRepo: "", want: true},
+		{name: "deleted fork has no head repo", headRepo: "", baseRepo: "timmyjinks/tysoncloud", want: true},
 		{name: "both unknown fails closed", headRepo: "", baseRepo: "", want: true},
 	}
 	for _, tt := range tests {

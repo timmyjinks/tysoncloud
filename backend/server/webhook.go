@@ -386,12 +386,11 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// head.repo is null once a fork is deleted, but GitHub still serves
+		// the PR's commits from the base repo, so an empty head is a fork.
 		headRepo := strings.TrimSpace(payload.PullRequest.Head.Repo.FullName)
-		if headRepo == "" {
-			headRepo = payload.Repository.FullName
-		}
 		if util.IsForkPR(headRepo, payload.Repository.FullName) {
-			slog.Warn("preview deploy: skipping fork PR", "repo_id", payload.Repository.Id, "head_repo", headRepo, "pr", payload.Number)
+			slog.Warn("preview deploy: skipping fork or unknown-head PR", "repo_id", payload.Repository.Id, "head_repo", headRepo, "pr", payload.Number)
 			if token, _ := app.Github.GetInstallationToken(r.Context(), installationId); token != "" {
 				bg, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
@@ -521,11 +520,8 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		cheadSHA, cheadRef, cheadRepo := app.fetchPRHead(r.Context(), ctoken, cpayload.Repository.FullName, cpayload.Issue.Number)
-		if cheadRepo == "" {
-			cheadRepo = cpayload.Repository.FullName
-		}
 		if util.IsForkPR(cheadRepo, cpayload.Repository.FullName) {
-			slog.Warn("preview retry: skipping fork PR", "repo_id", cpayload.Repository.Id, "head_repo", cheadRepo, "pr", cpayload.Issue.Number)
+			slog.Warn("preview retry: skipping fork or unknown-head PR", "repo_id", cpayload.Repository.Id, "head_repo", cheadRepo, "pr", cpayload.Issue.Number)
 			w.WriteHeader(http.StatusOK)
 			return
 		}

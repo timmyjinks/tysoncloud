@@ -235,6 +235,10 @@ func TestRenderPreviewNotices(t *testing.T) {
 	if !strings.HasPrefix(torn, marker) || !strings.Contains(torn, "torn down") || strings.Contains(torn, previewRetryBox) {
 		t.Errorf("torn down = %q", torn)
 	}
+	fork := renderPreviewForkComment(marker, 7)
+	if !strings.HasPrefix(fork, marker) || !strings.Contains(fork, "fork") || strings.Contains(fork, previewRetryBox) {
+		t.Errorf("fork = %q", fork)
+	}
 }
 
 func TestPreviewErrorRegistry(t *testing.T) {

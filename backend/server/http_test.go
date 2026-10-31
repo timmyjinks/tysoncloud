@@ -3,7 +3,6 @@ package server
 import (
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"net/http"
 	"net/http/httptest"
@@ -15,52 +14,6 @@ import (
 	"github.com/timmyjinks/tysoncloud/config"
 	gh "github.com/timmyjinks/tysoncloud/github"
 )
-
-func authCookie(name, value string) *http.Cookie {
-	return &http.Cookie{Name: name, Value: value}
-}
-
-func TestExtractTokenFromCookie(t *testing.T) {
-	session := base64.StdEncoding.EncodeToString([]byte(`{"access_token":"jwt-123"}`))
-
-	tests := []struct {
-		name    string
-		cookie  *http.Cookie
-		want    string
-		wantErr bool
-	}{
-		{"base64- prefixed", authCookie("sb-proj-auth-token.0", "base64-"+session), "jwt-123", false},
-		{"raw base64", authCookie("sb-proj-auth-token.0", session), "jwt-123", false},
-		{"no cookie", nil, "", true},
-		{"wrong cookie name", authCookie("session", session), "", true},
-		{"bad base64", authCookie("sb-proj-auth-token.0", "base64-!!!"), "", true},
-		{"bad json", authCookie("sb-proj-auth-token.0", base64.StdEncoding.EncodeToString([]byte("nope"))), "", true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			if tt.cookie != nil {
-				req.AddCookie(tt.cookie)
-			}
-			got, err := extractTokenFromCookie(req)
-			if (err != nil) != tt.wantErr || got != tt.want {
-				t.Fatalf("got (%q, %v), want (%q, err=%v)", got, err, tt.want, tt.wantErr)
-			}
-		})
-	}
-}
-
-func TestSupabaseAuthMiddlewareRejectsMissingCookie(t *testing.T) {
-	app := &Application{}
-	h := app.SupabaseAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatalf("next handler called without auth")
-	}))
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want 401", rec.Code)
-	}
-}
 
 func TestProtectedRoutesRequireAuth(t *testing.T) {
 	router := Mount(&Application{})

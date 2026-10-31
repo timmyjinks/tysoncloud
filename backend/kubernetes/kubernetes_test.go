@@ -72,6 +72,14 @@ func TestCreateDeployment(t *testing.T) {
 	if len(c.EnvFrom) != 0 {
 		t.Fatalf("EnvFrom set without env: %+v", c.EnvFrom)
 	}
+
+	if hu := d.Spec.Template.Spec.HostUsers; hu == nil || *hu {
+		t.Fatalf("HostUsers = %v, want false so container root is not host root", hu)
+	}
+	csc := c.SecurityContext
+	if csc == nil || csc.Privileged == nil || *csc.Privileged || csc.AllowPrivilegeEscalation == nil || *csc.AllowPrivilegeEscalation {
+		t.Fatalf("container must be unprivileged with no escalation: %+v", csc)
+	}
 }
 
 func TestCreateDeploymentLatestAndEnv(t *testing.T) {

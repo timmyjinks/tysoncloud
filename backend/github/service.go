@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -454,6 +455,10 @@ func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessTok
 	}
 	defer os.RemoveAll(cloneDir)
 	emit("[state] building: cloning succeeded")
+	if err := stripGitDir(cloneDir); err != nil {
+		emitErr("remove .git failed", err, "")
+		return "", err
+	}
 
 	buildCtx, err := resolveBuildContext(cloneDir, rootDir)
 	if err != nil {
@@ -507,7 +512,7 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 
 	if strings.TrimSpace(headSHA) != "" {
 		fetch := exec.CommandContext(ctx, "git", "-C", cloneDir, "fetch", "origin", strings.TrimSpace(headSHA), "--depth", "1")
-		fetch.Env = os.Environ()
+		fetch.Env = gitAuthEnv(accessToken)
 		if out, ferr := runCmdWithLogs(fetch, logFn); ferr != nil {
 			slog.Warn("git fetch sha failed, trying checkout", "sha", headSHA, "err", ferr, "output", out)
 		}
@@ -526,6 +531,10 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 		if !checkedOut {
 			slog.Warn("git checkout sha failed, using branch tip", "sha", headSHA)
 		}
+	}
+	if err := stripGitDir(cloneDir); err != nil {
+		emitErr("remove .git failed", err, "")
+		return "", err
 	}
 
 	buildCtx, err := resolveBuildContext(cloneDir, rootDir)
@@ -665,18 +674,13 @@ func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken, branch string
 	}
 	os.RemoveAll(parent)
 
-	url := cloneURL
-	if accessToken != "" && strings.HasPrefix(cloneURL, "https://") {
-		url = strings.Replace(cloneURL, "https://", "https://x-access-token:"+accessToken+"@", 1)
-	}
-
 	args := []string{"clone", "--depth", "1"}
 	if strings.TrimSpace(branch) != "" {
 		args = append(args, "--branch", strings.TrimSpace(branch))
 	}
-	args = append(args, url, parent)
+	args = append(args, cloneURL, parent)
 	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Env = os.Environ()
+	cmd.Env = gitAuthEnv(accessToken)
 	out, err := runCmdWithLogs(cmd, logFn)
 	if err != nil {
 		os.RemoveAll(parent)
@@ -684,6 +688,30 @@ func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken, branch string
 		return "", fmt.Errorf("git clone failed: %w", err)
 	}
 	return parent, nil
+}
+
+// gitAuthEnv returns the process env plus an http.extraheader that
+// authenticates git to github.com with the installation token. Passing it
+// through GIT_CONFIG_* (as actions/checkout does) keeps the token off argv
+// and out of .git/config, so it can't end up in the build context or image.
+func gitAuthEnv(accessToken string) []string {
+	env := os.Environ()
+	if accessToken == "" {
+		return env
+	}
+	basic := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + accessToken))
+	return append(env,
+		"GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=http.https://github.com/.extraheader",
+		"GIT_CONFIG_VALUE_0=AUTHORIZATION: basic "+basic,
+	)
+}
+
+// stripGitDir removes the clone's .git directory once checkout is done.
+// Railpack copies the whole build context into the image, and repo history
+// and remote config have no business shipping with the app.
+func stripGitDir(cloneDir string) error {
+	return os.RemoveAll(filepath.Join(cloneDir, ".git"))
 }
 
 func buildImageWithRailpack(ctx context.Context, buildContext, imageTag string) (string, error) {

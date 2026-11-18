@@ -1,203 +1,231 @@
-export type Project = {
-  id: string;
-  name: string;
-};
+import { z } from "zod";
 
-export type ProjectCreateRequest = {
-  name: string;
-};
+// Each API shape is declared once as a Zod schema; the TypeScript type is
+// inferred from it so the two can never drift apart.
 
-export type ProjectUpdateRequest = {
-  name?: string;
-};
+const EnvMapSchema = z.record(z.string(), z.string());
 
-export type Service = {
-  id: string;
-  project_id: string;
-  name: string;
-  image: string;
-  port: number;
-  status: string;
-  public_domain: string;
-  private_domain: string; // conceptually "internal_domain"
-  env: Record<string, string>;
-  created_at: string;
-};
+export const ProjectSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type Project = z.infer<typeof ProjectSchema>;
 
-export type ServiceCreateRequest = {
-  name: string;
-  image: string;
-  port: number;
-  domain?: string | null;
-  env?: string;
-};
+export const ProjectCreateRequestSchema = z.object({
+  name: z.string(),
+});
+export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>;
 
-export type ServiceUpdateRequest = {
-  name?: string;
-  image?: string;
-  port?: number;
-  domain?: string | null;
-  env?: string;
-};
+export const ProjectUpdateRequestSchema = ProjectCreateRequestSchema.partial();
+export type ProjectUpdateRequest = z.infer<typeof ProjectUpdateRequestSchema>;
 
-export type Database = {
-  id: string;
-  project_id: string;
-  name: string;
-  engine: string;
-  port: number;
-  storage: number;
-  internal_domain: string;
-  env: Record<string, string>;
-  created_at: string;
-};
+export const ServiceSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  image: z.string(),
+  port: z.number(),
+  status: z.string(),
+  public_domain: z.string(),
+  private_domain: z.string(), // conceptually "internal_domain"
+  env: EnvMapSchema,
+  created_at: z.string(),
+});
+export type Service = z.infer<typeof ServiceSchema>;
 
-export type DatabaseCreateRequest = {
-  name: string;
-  engine: string;
-  storage_gb: number;
-};
+export const ServiceCreateRequestSchema = z.object({
+  name: z.string(),
+  image: z.string(),
+  port: z.number(),
+  domain: z.string().nullable().optional(),
+  env: z.string().optional(),
+});
+export type ServiceCreateRequest = z.infer<typeof ServiceCreateRequestSchema>;
 
-export type DatabaseUpdateRequest = {
-  name?: string;
-  engine?: string;
-  storage_gb?: number;
-};
+export const ServiceUpdateRequestSchema = ServiceCreateRequestSchema.partial();
+export type ServiceUpdateRequest = z.infer<typeof ServiceUpdateRequestSchema>;
 
-export type Volume = {
-  id: string;
-  service_id: string;
-  mount_path: string;
-  storage_gb: number;
-  created_at: string;
-};
+export const DatabaseSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  engine: z.string(),
+  port: z.number(),
+  storage: z.number(),
+  internal_domain: z.string(),
+  env: EnvMapSchema,
+  created_at: z.string(),
+});
+export type Database = z.infer<typeof DatabaseSchema>;
 
-export type VolumeCreateRequest = {
-  mount_path: string;
-  storage_gb: number;
-};
+export const DatabaseCreateRequestSchema = z.object({
+  name: z.string(),
+  engine: z.string(),
+  storage_gb: z.number(),
+});
+export type DatabaseCreateRequest = z.infer<typeof DatabaseCreateRequestSchema>;
 
-export type ApiError = {
-  error?: string;
-  message?: string;
-  issues?: { line?: number; message: string }[];
-};
+export const DatabaseUpdateRequestSchema = DatabaseCreateRequestSchema.partial();
+export type DatabaseUpdateRequest = z.infer<typeof DatabaseUpdateRequestSchema>;
 
-export type BulkDeleteResponse = {
-  deleted: string[];
-  failed: { id: string; error: string }[];
-};
+export const VolumeSchema = z.object({
+  id: z.string(),
+  service_id: z.string(),
+  mount_path: z.string(),
+  storage_gb: z.number(),
+  created_at: z.string(),
+});
+export type Volume = z.infer<typeof VolumeSchema>;
 
-export type ProjectConfigApplyRequest = {
-  content: string;
-};
+export const VolumeCreateRequestSchema = z.object({
+  mount_path: z.string(),
+  storage_gb: z.number(),
+});
+export type VolumeCreateRequest = z.infer<typeof VolumeCreateRequestSchema>;
 
-export type GithubService = {
-  id: string;
-  project_id: string;
-  name: string;
-  repo_name: string;
-  repo_id: number;
-  root_dir: string;
-  branch: string;
-  port: number;
-  status: string;
-  public_domain: string;
-  private_domain: string;
-  env: Record<string, string>;
-  created_at: string;
-};
+export const ApiErrorSchema = z.object({
+  error: z.string().optional(),
+  message: z.string().optional(),
+  issues: z
+    .array(
+      z.object({
+        line: z.number().optional(),
+        message: z.string(),
+      }),
+    )
+    .optional(),
+});
+export type ApiError = z.infer<typeof ApiErrorSchema>;
 
-export type GithubServiceCreateRequest = {
-  name: string;
-  repo: string;
-  repo_id: number;
-  port: number;
-  domain?: string | null;
-  root_dir: string;
-  branch?: string;
-  env?: string;
-};
+export const BulkDeleteResponseSchema = z.object({
+  deleted: z.array(z.string()),
+  failed: z.array(
+    z.object({
+      id: z.string(),
+      error: z.string(),
+    }),
+  ),
+});
+export type BulkDeleteResponse = z.infer<typeof BulkDeleteResponseSchema>;
 
-export type GithubServiceUpdateRequest = {
-  name?: string;
-  port?: number;
-  domain?: string | null;
-  env?: string;
-  branch?: string;
-};
+export const ProjectConfigApplyRequestSchema = z.object({
+  content: z.string(),
+});
+export type ProjectConfigApplyRequest = z.infer<typeof ProjectConfigApplyRequestSchema>;
 
-export type GithubConnection = {
-  id: string;
-  user_id: string;
-  installation_id: number;
-  created_at: string;
-};
+export const GithubServiceSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  repo_name: z.string(),
+  repo_id: z.number(),
+  root_dir: z.string(),
+  branch: z.string(),
+  port: z.number(),
+  status: z.string(),
+  public_domain: z.string(),
+  private_domain: z.string(),
+  env: EnvMapSchema,
+  created_at: z.string(),
+});
+export type GithubService = z.infer<typeof GithubServiceSchema>;
 
-export type GithubConnectionCreateRequest = {
-  installation_id: number;
+export const GithubServiceCreateRequestSchema = z.object({
+  name: z.string(),
+  repo: z.string(),
+  repo_id: z.number(),
+  port: z.number(),
+  domain: z.string().nullable().optional(),
+  root_dir: z.string(),
+  branch: z.string().optional(),
+  env: z.string().optional(),
+});
+export type GithubServiceCreateRequest = z.infer<typeof GithubServiceCreateRequestSchema>;
+
+export const GithubServiceUpdateRequestSchema = GithubServiceCreateRequestSchema.pick({
+  name: true,
+  port: true,
+  domain: true,
+  env: true,
+  branch: true,
+}).partial();
+export type GithubServiceUpdateRequest = z.infer<typeof GithubServiceUpdateRequestSchema>;
+
+export const GithubConnectionSchema = z.object({
+  id: z.string(),
+  user_id: z.string(),
+  installation_id: z.number(),
+  created_at: z.string(),
+});
+export type GithubConnection = z.infer<typeof GithubConnectionSchema>;
+
+export const GithubConnectionCreateRequestSchema = z.object({
+  installation_id: z.number(),
   // GitHub user-authorization code from the install redirect; the backend
   // exchanges it to prove the user can access the installation.
-  code: string;
-};
+  code: z.string(),
+});
+export type GithubConnectionCreateRequest = z.infer<typeof GithubConnectionCreateRequestSchema>;
 
-export type GithubRepo = {
-  id: number;
-  name: string;
-  full_name: string;
-  clone_url: string;
-  html_url: string;
-  private: boolean;
-  default_branch: string;
-};
+export const GithubRepoSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  clone_url: z.string(),
+  html_url: z.string(),
+  private: z.boolean(),
+  default_branch: z.string(),
+});
+export type GithubRepo = z.infer<typeof GithubRepoSchema>;
 
-export type GithubReposResponse = {
-  total_count: number;
-  repositories: GithubRepo[];
-};
+export const GithubReposResponseSchema = z.object({
+  total_count: z.number(),
+  repositories: z.array(GithubRepoSchema),
+});
+export type GithubReposResponse = z.infer<typeof GithubReposResponseSchema>;
 
-export type PreviewEnvironmentService = {
-  id: string;
-  preview_env_id: string;
-  env_name: string;
-  source_type: string;
-  source_service_id: string;
-  github_service_id: string;
-  service_name: string;
-  repo_name: string;
-  engine: string;
-  pr: number;
-  pr_url: string;
-  branch: string;
-  hostname: string;
-  url: string;
-  env: Record<string, string>;
-  preview_url: string;
-  port: number;
-  status: string;
-  created_at: string;
-};
+export const PreviewEnvironmentServiceSchema = z.object({
+  id: z.string(),
+  preview_env_id: z.string(),
+  env_name: z.string(),
+  source_type: z.string(),
+  source_service_id: z.string(),
+  github_service_id: z.string(),
+  service_name: z.string(),
+  repo_name: z.string(),
+  engine: z.string(),
+  pr: z.number(),
+  pr_url: z.string(),
+  branch: z.string(),
+  hostname: z.string(),
+  url: z.string(),
+  env: EnvMapSchema,
+  preview_url: z.string(),
+  port: z.number(),
+  status: z.string(),
+  created_at: z.string(),
+});
+export type PreviewEnvironmentService = z.infer<typeof PreviewEnvironmentServiceSchema>;
 
-export type PreviewEnvironment = {
-  id: string;
-  project_id: string;
-  name: string;
-  pr: number;
-  namespace: string;
-  created_at: string;
-};
+export const PreviewEnvironmentSchema = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  name: z.string(),
+  pr: z.number(),
+  namespace: z.string(),
+  created_at: z.string(),
+});
+export type PreviewEnvironment = z.infer<typeof PreviewEnvironmentSchema>;
 
-export type PreviewEnvironmentServiceUpdateRequest = {
-  env?: string;
-  port?: number;
-};
+export const PreviewEnvironmentServiceUpdateRequestSchema = z.object({
+  env: z.string().optional(),
+  port: z.number().optional(),
+});
+export type PreviewEnvironmentServiceUpdateRequest = z.infer<
+  typeof PreviewEnvironmentServiceUpdateRequestSchema
+>;
 
-export type PreviewEnvironmentServices = {
-  id: string;
-  project_id: string;
-  name: string;
-  pr: number;
-  namespace: string;
-  services: PreviewEnvironmentService[];
-  created_at: string;
-};
+export const PreviewEnvironmentServicesSchema = PreviewEnvironmentSchema.extend({
+  services: z.array(PreviewEnvironmentServiceSchema),
+});
+export type PreviewEnvironmentServices = z.infer<typeof PreviewEnvironmentServicesSchema>;

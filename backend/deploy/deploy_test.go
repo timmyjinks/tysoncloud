@@ -159,6 +159,33 @@ func TestCreateProject(t *testing.T) {
 	}
 }
 
+func TestReconcileProjectsAppliesNetworkPolicy(t *testing.T) {
+	ctx := context.Background()
+	// A managed namespace that predates the policy: no NetworkPolicies yet.
+	legacy := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+		Name:   "proj-legacy",
+		Labels: map[string]string{"managed-by": "tysoncloud"},
+	}}
+	d, cs, _ := newTestDeploy(t, legacy)
+	if err := d.CreateProject(ctx, testNS); err != nil {
+		t.Fatalf("CreateProject: %v", err)
+	}
+	// Simulate a deleted policy in the managed namespace.
+	if err := cs.NetworkingV1().NetworkPolicies(testNS).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{}); err != nil {
+		t.Fatalf("delete policies: %v", err)
+	}
+
+	if err := d.ReconcileProjects(ctx); err != nil {
+		t.Fatalf("ReconcileProjects: %v", err)
+	}
+	for _, ns := range []string{"proj-legacy", testNS} {
+		policies, _ := cs.NetworkingV1().NetworkPolicies(ns).List(ctx, metav1.ListOptions{})
+		if len(policies.Items) != 2 {
+			t.Fatalf("%s: network policies = %d, want 2", ns, len(policies.Items))
+		}
+	}
+}
+
 func TestCreateProjectRollsBackNamespace(t *testing.T) {
 	ctx := context.Background()
 	d, cs, _ := newTestDeploy(t)

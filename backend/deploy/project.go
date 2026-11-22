@@ -27,9 +27,10 @@ func (d *DeployService) CreateProject(ctx context.Context, namespace string) err
 }
 
 // ReconcileProjects re-applies the namespace labels (Pod Security Admission),
-// ResourceQuota and LimitRange to every existing tysoncloud namespace, so
-// namespaces created before those guards existed get them too. Errors are
-// logged per namespace and don't stop the rest.
+// NetworkPolicy, ResourceQuota and LimitRange to every existing tysoncloud
+// namespace, so namespaces created before those guards existed get them too,
+// and policy changes reach existing namespaces. Errors are logged per
+// namespace and don't stop the rest.
 func (d *DeployService) ReconcileProjects(ctx context.Context) error {
 	namespaces, err := d.svc.ListManagedNamespaces(ctx)
 	if err != nil {
@@ -38,6 +39,7 @@ func (d *DeployService) ReconcileProjects(ctx context.Context) error {
 	for _, namespace := range namespaces {
 		for _, apply := range []func(context.Context, string) error{
 			d.svc.CreateNamespace,
+			func(ctx context.Context, ns string) error { return d.svc.CreateNetworkPolicy(ctx, ns, d.svc.ClusterIP) },
 			d.svc.CreateResourceQuota,
 			d.svc.CreateLimitRange,
 		} {

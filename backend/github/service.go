@@ -32,6 +32,7 @@ import (
 type Service struct {
 	cfg    config.Github
 	reg    config.Registry
+	bk     config.Buildkit
 	logs   *BuildLogStore
 	builds chan struct{}
 }
@@ -42,6 +43,39 @@ func NewService(cfg config.Github, reg config.Registry) *Service {
 		slots = 2
 	}
 	return &Service{cfg: cfg, reg: reg, logs: NewBuildLogStore(), builds: make(chan struct{}, slots)}
+}
+
+func (s *Service) WithBuildkit(bk config.Buildkit) *Service {
+	s.bk = bk
+	return s
+}
+
+type buildOptions struct {
+	globalArgs   []string
+	env          []string
+	registryHost string
+}
+
+func (s *Service) buildOptions() buildOptions {
+	var o buildOptions
+	if s.bk.Host != "" {
+		o.globalArgs = append(o.globalArgs, "--addr", s.bk.Host)
+	}
+	if s.bk.TLSEnabled() {
+		o.globalArgs = append(o.globalArgs,
+			"--tlscacert", s.bk.TLSCACert,
+			"--tlscert", s.bk.TLSCert,
+			"--tlskey", s.bk.TLSKey,
+		)
+		if s.bk.ServerName != "" {
+			o.globalArgs = append(o.globalArgs, "--tlsservername", s.bk.ServerName)
+		}
+	}
+	if s.reg.DockerConfigDir != "" {
+		o.env = append(o.env, "DOCKER_CONFIG="+s.reg.DockerConfigDir)
+	}
+	o.registryHost = util.RegistryHost(s.reg.URL)
+	return o
 }
 
 // acquireBuildSlot blocks until one of the MaxConcurrentBuilds slots is free
@@ -467,7 +501,7 @@ func (s *Service) CloneAndBuildWithLogs(ctx context.Context, cloneURL, accessTok
 	}
 
 	emit(fmt.Sprintf("[state] building: railpack prepare context=%s", buildCtx))
-	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env)
+	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env, s.buildOptions())
 	if err != nil {
 		return "", err
 	}
@@ -544,7 +578,7 @@ func (s *Service) CloneAndBuildPRWithLogs(ctx context.Context, cloneURL, accessT
 	}
 
 	emit(fmt.Sprintf("[state] building: railpack prepare context=%s", buildCtx))
-	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env)
+	image, err := buildImageWithRailpackWithLogs(ctx, buildCtx, imageTag, logFn, env, s.buildOptions())
 	if err != nil {
 		return "", err
 	}
@@ -715,10 +749,42 @@ func stripGitDir(cloneDir string) error {
 }
 
 func buildImageWithRailpack(ctx context.Context, buildContext, imageTag string) (string, error) {
-	return buildImageWithRailpackWithLogs(ctx, buildContext, imageTag, nil, nil)
+	return buildImageWithRailpackWithLogs(ctx, buildContext, imageTag, nil, nil, buildOptions{})
 }
 
-func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag string, logFn func(string), env map[string][]byte) (string, error) {
+func planReferencesHost(plan []byte, host string) (bool, error) {
+	if host == "" {
+		return false, nil
+	}
+	var v any
+	if err := json.Unmarshal(plan, &v); err != nil {
+		return false, err
+	}
+	host = strings.ToLower(host)
+	var walk func(any) bool
+	walk = func(v any) bool {
+		switch t := v.(type) {
+		case string:
+			return strings.Contains(strings.ToLower(t), host)
+		case []any:
+			for _, e := range t {
+				if walk(e) {
+					return true
+				}
+			}
+		case map[string]any:
+			for k, e := range t {
+				if strings.Contains(strings.ToLower(k), host) || walk(e) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	return walk(v), nil
+}
+
+func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag string, logFn func(string), env map[string][]byte, opts buildOptions) (string, error) {
 	if buildContext == "" {
 		return "", fmt.Errorf("build context is empty")
 	}
@@ -755,13 +821,27 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		return "", fmt.Errorf("railpack prepare failed: %w", err)
 	}
 
-	buildArgs := []string{
-		"build",
-		"--local", "context=" + buildContext,
-		"--local", "dockerfile=" + planDir,
-		"--frontend=gateway.v0",
-		"--opt", "source=" + railpackFrontendImage,
+	plan, err := os.ReadFile(planPath)
+	if err != nil {
+		return "", fmt.Errorf("read railpack plan: %w", err)
 	}
+	if refs, err := planReferencesHost(plan, opts.registryHost); err != nil {
+		return "", fmt.Errorf("parse railpack plan: %w", err)
+	} else if refs {
+		msg := "railpack plan references the internal registry; its images can't be used as build inputs"
+		if logFn != nil {
+			logFn(msg)
+		}
+		return "", errors.New(msg)
+	}
+
+	buildArgs := append(append([]string{}, opts.globalArgs...),
+		"build",
+		"--local", "context="+buildContext,
+		"--local", "dockerfile="+planDir,
+		"--frontend=gateway.v0",
+		"--opt", "source="+railpackFrontendImage,
+	)
 	if secretArgs := buildctlSecretArgs(env); len(secretArgs) > 0 {
 		buildArgs = append(buildArgs, secretArgs...)
 	}
@@ -772,7 +852,7 @@ func buildImageWithRailpackWithLogs(ctx context.Context, buildContext, imageTag 
 		"--output", fmt.Sprintf("type=image,name=%s,push=true,registry.insecure=true", imageTag),
 	)
 	buildCmd := exec.CommandContext(ctx, "buildctl", buildArgs...)
-	buildCmd.Env = exportEnv(os.Environ(), env)
+	buildCmd.Env = append(exportEnv(os.Environ(), env), opts.env...)
 	if keys := railpackEnvKeys(env); len(keys) > 0 {
 		msg := fmt.Sprintf("[state] building: buildctl secret_ids=%d [%s]", len(keys), strings.Join(keys, ","))
 		slog.Info(msg)

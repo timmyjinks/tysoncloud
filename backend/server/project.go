@@ -195,6 +195,12 @@ func (app *Application) ConfigProject(w http.ResponseWriter, r *http.Request) {
 		writeIssuesError(w, http.StatusBadRequest, "The config has some problems.", issues, nil)
 		return
 	}
+	for _, service := range config.Services {
+		if app.isInternalRegistryImage(service.Image) {
+			writeError(w, http.StatusBadRequest, msgInternalRegistryImage, nil)
+			return
+		}
+	}
 
 	rb := newConfigRollback(projectId, userId)
 	success := false

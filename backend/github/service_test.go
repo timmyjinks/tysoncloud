@@ -196,3 +196,51 @@ func TestRailpackEnvKeysSkipsReservedProcessVars(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+func TestPlanReferencesHost(t *testing.T) {
+	const host = "10.43.208.127:5000"
+	for plan, want := range map[string]bool{
+		`{"steps":[{"inputs":[{"image":"ghcr.io/railwayapp/railpack-runtime:latest"}]}]}`: false,
+		`{"steps":[{"inputs":[{"image":"10.43.208.127:5000/svc-victim:latest"}]}]}`:       true,
+		`{"deploy":{"base":{"image":"10.43.208.127:5000/svc-victim:latest"}}}`:            true,
+		`{"x":{"10.43.208.127:5000/svc-victim":1}}`:                                       true,
+		`{"deploy":{"startCommand":"node index.js"}}`:                                     false,
+	} {
+		got, err := planReferencesHost([]byte(plan), host)
+		if err != nil || got != want {
+			t.Errorf("planReferencesHost(%s) = %v, %v; want %v", plan, got, err, want)
+		}
+	}
+	if got, _ := planReferencesHost([]byte(`{"a":"10.43.208.127:5000/x"}`), ""); got {
+		t.Error("empty host must not match")
+	}
+	if _, err := planReferencesHost([]byte(`not json`), host); err == nil {
+		t.Error("invalid plan must error")
+	}
+}
+
+func TestBuildOptions(t *testing.T) {
+	s := NewService(config.Github{}, config.Registry{URL: "10.43.208.127:5000", DockerConfigDir: "/docker"}).WithBuildkit(config.Buildkit{
+		Host:       "tcp://buildkitd.tc-build.svc.cluster.local:1234",
+		TLSCACert:  "/tls/ca.crt",
+		TLSCert:    "/tls/tls.crt",
+		TLSKey:     "/tls/tls.key",
+		ServerName: "buildkitd.tc-build.svc.cluster.local",
+	})
+	o := s.buildOptions()
+	wantArgs := []string{
+		"--addr", "tcp://buildkitd.tc-build.svc.cluster.local:1234",
+		"--tlscacert", "/tls/ca.crt", "--tlscert", "/tls/tls.crt", "--tlskey", "/tls/tls.key",
+		"--tlsservername", "buildkitd.tc-build.svc.cluster.local",
+	}
+	if !reflect.DeepEqual(o.globalArgs, wantArgs) {
+		t.Errorf("globalArgs = %v, want %v", o.globalArgs, wantArgs)
+	}
+	if !reflect.DeepEqual(o.env, []string{"DOCKER_CONFIG=/docker"}) || o.registryHost != "10.43.208.127:5000" {
+		t.Errorf("env/registryHost = %v %q", o.env, o.registryHost)
+	}
+
+	if o := NewService(config.Github{}, config.Registry{}).buildOptions(); len(o.globalArgs) != 0 || len(o.env) != 0 {
+		t.Errorf("unconfigured buildOptions should be empty: %+v", o)
+	}
+}

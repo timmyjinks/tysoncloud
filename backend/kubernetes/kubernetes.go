@@ -12,6 +12,9 @@ type KubernetesService struct {
 	clientset     kubernetes.Interface
 	gatewayClient gatewayclient.Interface
 	dynamicClient dynamic.Interface
+
+	registryURL        string
+	registryPullConfig []byte
 }
 
 func NewKubernetesService(kubeconfigPath string, clusterIp string) (*KubernetesService, error) {

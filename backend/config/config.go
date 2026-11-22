@@ -14,6 +14,7 @@ type Config struct {
 	Supabase   Supabase
 	Github     Github
 	Registry   Registry
+	Buildkit   Buildkit
 	KubeConfig string `env:"KUBECONFIG"`
 }
 
@@ -37,7 +38,16 @@ type Github struct {
 }
 
 type Registry struct {
-	URL string `env:"REGISTRY_URL"`
+	URL             string `env:"REGISTRY_URL"`
+	DockerConfigDir string `env:"REGISTRY_DOCKER_CONFIG"`
+}
+
+type Buildkit struct {
+	Host       string `env:"BUILDKIT_HOST"`
+	TLSCACert  string `env:"BUILDKIT_TLS_CA_CERT"`
+	TLSCert    string `env:"BUILDKIT_TLS_CERT"`
+	TLSKey     string `env:"BUILDKIT_TLS_KEY"`
+	ServerName string `env:"BUILDKIT_TLS_SERVER_NAME"`
 }
 
 type Supabase struct {
@@ -50,7 +60,7 @@ func Load() (Config, error) {
 		slog.Error(err.Error())
 	}
 
-	return Config{
+	cfg := Config{
 		Server: Server{
 			Addr:           getString("ADDR", ":8080"),
 			AllowedOrigins: getString("ALLOWED_ORIGINS", ""),
@@ -73,10 +83,39 @@ func Load() (Config, error) {
 			MaxConcurrentBuilds: getInt("MAX_CONCURRENT_BUILDS", 2),
 		},
 		Registry: Registry{
-			URL: getString("REGISTRY_URL", "10.43.41.193:5000"),
+			URL:             getString("REGISTRY_URL", "10.43.41.193:5000"),
+			DockerConfigDir: getString("REGISTRY_DOCKER_CONFIG", ""),
+		},
+		Buildkit: Buildkit{
+			Host:       getString("BUILDKIT_HOST", ""),
+			TLSCACert:  getString("BUILDKIT_TLS_CA_CERT", ""),
+			TLSCert:    getString("BUILDKIT_TLS_CERT", ""),
+			TLSKey:     getString("BUILDKIT_TLS_KEY", ""),
+			ServerName: getString("BUILDKIT_TLS_SERVER_NAME", ""),
 		},
 		KubeConfig: getString("KUBECONFIG", "~/.kube/config"),
-	}, nil
+	}
+	if err := cfg.Buildkit.validate(); err != nil {
+		return Config{}, err
+	}
+	return cfg, nil
+}
+
+func (b Buildkit) validate() error {
+	set := 0
+	for _, v := range []string{b.TLSCACert, b.TLSCert, b.TLSKey} {
+		if v != "" {
+			set++
+		}
+	}
+	if set != 0 && set != 3 {
+		return fmt.Errorf("BUILDKIT_TLS_CA_CERT, BUILDKIT_TLS_CERT and BUILDKIT_TLS_KEY must be set together")
+	}
+	return nil
+}
+
+func (b Buildkit) TLSEnabled() bool {
+	return b.TLSCACert != "" && b.TLSCert != "" && b.TLSKey != ""
 }
 
 func getString(key, fallback string) string {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/clerk/clerk-sdk-go/v2"
@@ -33,6 +35,16 @@ func main() {
 		panic(err)
 	}
 
+	if cfg.Registry.DockerConfigDir != "" {
+		dockerCfg, err := os.ReadFile(filepath.Join(cfg.Registry.DockerConfigDir, "config.json"))
+		if err != nil {
+			log.Fatalf("read registry docker config: %v", err)
+		}
+		if err := kubernetesService.ConfigureRegistryPull(cfg.Registry.URL, dockerCfg); err != nil {
+			log.Fatal(err)
+		}
+	}
+
 	deployService := deploy.NewDeployService(kubernetesService)
 
 	go func() {
@@ -43,7 +55,7 @@ func main() {
 		}
 	}()
 
-	githubService := github.NewService(cfg.Github, cfg.Registry)
+	githubService := github.NewService(cfg.Github, cfg.Registry).WithBuildkit(cfg.Buildkit)
 
 	clerk.SetKey(cfg.Server.ClerkApiKey)
 

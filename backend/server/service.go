@@ -192,6 +192,10 @@ func (app *Application) CreateService(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "A Docker image is required.", nil)
 		return
 	}
+	if app.isInternalRegistryImage(service.Image) {
+		writeError(w, http.StatusBadRequest, msgInternalRegistryImage, nil)
+		return
+	}
 	if ok, err := util.ValidateEnv(service.Env); err != nil || !ok {
 		writeError(w, http.StatusBadRequest, "Environment variables must be one KEY=value pair per line.", err)
 		return
@@ -295,6 +299,13 @@ func (app *Application) UpdateService(w http.ResponseWriter, r *http.Request) {
 	if service.Image == nil || *service.Image == "" {
 		writeError(w, http.StatusBadRequest, "A Docker image is required.", nil)
 		return
+	}
+	if app.isInternalRegistryImage(*service.Image) {
+		current, err := app.Supabase.GetServiceById(serviceId)
+		if err != nil || current.Image != *service.Image {
+			writeError(w, http.StatusBadRequest, msgInternalRegistryImage, err)
+			return
+		}
 	}
 	if service.Port == nil {
 		writeError(w, http.StatusBadRequest, "A port is required.", nil)

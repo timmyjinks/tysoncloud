@@ -11,7 +11,7 @@ func setRequired(t *testing.T) {
 
 func TestLoadDefaults(t *testing.T) {
 	setRequired(t)
-	for _, k := range []string{"ADDR", "ALLOWED_ORIGINS", "CLUSTER_IP", "REGISTRY_URL", "KUBECONFIG"} {
+	for _, k := range []string{"ADDR", "ALLOWED_ORIGINS", "CLUSTER_IP", "REGISTRY_URL", "KUBECONFIG", "BUILDKIT_HOST", "BUILDKIT_TLS_CA_CERT", "BUILDKIT_TLS_CERT", "BUILDKIT_TLS_KEY", "REGISTRY_DOCKER_CONFIG"} {
 		t.Setenv(k, "")
 	}
 
@@ -30,6 +30,36 @@ func TestLoadDefaults(t *testing.T) {
 	}
 	if cfg.Registry.URL == "" || cfg.KubeConfig == "" || cfg.Server.ClusterIp == "" {
 		t.Errorf("defaults missing: %+v", cfg)
+	}
+	if cfg.Buildkit.TLSEnabled() || cfg.Registry.DockerConfigDir != "" {
+		t.Errorf("buildkit TLS / registry auth should be off by default: %+v", cfg)
+	}
+}
+
+func TestLoadBuildkitTLS(t *testing.T) {
+	setRequired(t)
+	t.Setenv("BUILDKIT_HOST", "tcp://buildkitd.tc-build.svc.cluster.local:1234")
+	t.Setenv("BUILDKIT_TLS_CA_CERT", "/certs/ca.crt")
+	t.Setenv("BUILDKIT_TLS_CERT", "/certs/tls.crt")
+	t.Setenv("BUILDKIT_TLS_KEY", "/certs/tls.key")
+	t.Setenv("REGISTRY_DOCKER_CONFIG", "/docker")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Buildkit.TLSEnabled() || cfg.Buildkit.Host != "tcp://buildkitd.tc-build.svc.cluster.local:1234" || cfg.Registry.DockerConfigDir != "/docker" {
+		t.Errorf("buildkit/registry config not loaded: %+v", cfg)
+	}
+}
+
+func TestLoadRejectsPartialBuildkitTLS(t *testing.T) {
+	setRequired(t)
+	t.Setenv("BUILDKIT_TLS_CA_CERT", "/certs/ca.crt")
+	t.Setenv("BUILDKIT_TLS_CERT", "")
+	t.Setenv("BUILDKIT_TLS_KEY", "/certs/tls.key")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load accepted a partial BuildKit TLS config")
 	}
 }
 

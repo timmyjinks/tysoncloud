@@ -72,6 +72,15 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 		}
 	}
 
+	pullSecret, err := d.ensureRegistryPullSecret(ctx, resource.Namespace, resource.Image)
+	if err != nil {
+		return err
+	}
+	var pullSecrets []appcorev1.LocalObjectReferenceApplyConfiguration
+	if pullSecret != "" {
+		pullSecrets = []appcorev1.LocalObjectReferenceApplyConfiguration{{Name: &pullSecret}}
+	}
+
 	spec := &appsv1apply.DeploymentSpecApplyConfiguration{
 		Selector: &appmetav1.LabelSelectorApplyConfiguration{
 			MatchLabels: map[string]string{
@@ -94,7 +103,8 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 				},
 			},
 			Spec: &appcorev1.PodSpecApplyConfiguration{
-				Containers: container,
+				Containers:       container,
+				ImagePullSecrets: pullSecrets,
 				// Tenant workloads never need to talk to the Kubernetes API.
 				AutomountServiceAccountToken: util.BoolPtr(false),
 				// Tenant images are arbitrary and most expect to start as
@@ -117,7 +127,7 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 		},
 	}
 
-	_, err := d.clientset.AppsV1().Deployments(resource.Namespace).Apply(ctx, &appsv1apply.DeploymentApplyConfiguration{
+	_, err = d.clientset.AppsV1().Deployments(resource.Namespace).Apply(ctx, &appsv1apply.DeploymentApplyConfiguration{
 		TypeMetaApplyConfiguration: appmetav1.TypeMetaApplyConfiguration{
 			Kind:       util.StringPtr("Deployment"),
 			APIVersion: util.StringPtr("apps/v1"),

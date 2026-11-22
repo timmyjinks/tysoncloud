@@ -486,3 +486,85 @@ func TestGetDeploymentDiagnosticLogsNoPods(t *testing.T) {
 		t.Fatalf("line = %q", l)
 	}
 }
+
+func TestCreateDeploymentRegistryPullSecret(t *testing.T) {
+	ctx := context.Background()
+	svc, cs, _, _ := newTestService(t)
+	dockerCfg := []byte(`{"auths":{"10.43.208.127:5000":{"auth":"dXNlcjpwYXNz"},"ghcr.io":{"auth":"b3RoZXI6c2VjcmV0"}}}`)
+	if err := svc.ConfigureRegistryPull("10.43.208.127:5000", dockerCfg); err != nil {
+		t.Fatalf("ConfigureRegistryPull: %v", err)
+	}
+
+	if err := svc.CreateDeployment(ctx, Resource{Namespace: testNS, Name: "built", Image: "10.43.208.127:5000/built:latest", Port: 80}); err != nil {
+		t.Fatalf("CreateDeployment: %v", err)
+	}
+	d, err := cs.AppsV1().Deployments(testNS).Get(ctx, "built", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get deployment: %v", err)
+	}
+	if ps := d.Spec.Template.Spec.ImagePullSecrets; len(ps) != 1 || ps[0].Name != RegistryPullSecretName {
+		t.Fatalf("ImagePullSecrets = %+v, want %s", ps, RegistryPullSecretName)
+	}
+	sec, err := cs.CoreV1().Secrets(testNS).Get(ctx, RegistryPullSecretName, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("get pull secret: %v", err)
+	}
+	if sec.Type != corev1.SecretTypeDockerConfigJson {
+		t.Fatalf("pull secret type = %s", sec.Type)
+	}
+	if got := string(sec.Data[corev1.DockerConfigJsonKey]); got != `{"auths":{"10.43.208.127:5000":{"auth":"dXNlcjpwYXNz"}}}` {
+		t.Fatalf("pull secret should only carry the internal registry entry, got %s", got)
+	}
+
+	if err := svc.CreateDeployment(ctx, Resource{Namespace: testNS, Name: "public", Image: "nginx:1.27", Port: 80}); err != nil {
+		t.Fatalf("CreateDeployment: %v", err)
+	}
+	d, _ = cs.AppsV1().Deployments(testNS).Get(ctx, "public", metav1.GetOptions{})
+	if ps := d.Spec.Template.Spec.ImagePullSecrets; len(ps) != 0 {
+		t.Fatalf("public image should get no pull secret, got %+v", ps)
+	}
+}
+
+func TestConfigureRegistryPullRejectsMissingHost(t *testing.T) {
+	svc, _, _, _ := newTestService(t)
+	if err := svc.ConfigureRegistryPull("10.43.208.127:5000", []byte(`{"auths":{"ghcr.io":{}}}`)); err == nil {
+		t.Fatal("expected error when config has no entry for the registry")
+	}
+	if err := svc.ConfigureRegistryPull("10.43.208.127:5000", []byte(`nope`)); err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestReconcileRegistryPullSecret(t *testing.T) {
+	ctx := context.Background()
+	mk := func(name, image string) *appsv1.Deployment {
+		return &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNS},
+			Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: name, Image: image}},
+			}}},
+		}
+	}
+	svc, cs, _, _ := newTestService(t, mk("built", "10.43.208.127:5000/built:latest"), mk("public", "nginx:1.27"))
+
+	if err := svc.ReconcileRegistryPullSecret(ctx, testNS); err != nil {
+		t.Fatalf("Reconcile (unconfigured): %v", err)
+	}
+	if err := svc.ConfigureRegistryPull("10.43.208.127:5000", []byte(`{"auths":{"10.43.208.127:5000":{"auth":"eDp5"}}}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.ReconcileRegistryPullSecret(ctx, testNS); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	built, _ := cs.AppsV1().Deployments(testNS).Get(ctx, "built", metav1.GetOptions{})
+	if !hasPullSecret(built.Spec.Template.Spec, RegistryPullSecretName) {
+		t.Fatalf("built deployment not patched: %+v", built.Spec.Template.Spec.ImagePullSecrets)
+	}
+	public, _ := cs.AppsV1().Deployments(testNS).Get(ctx, "public", metav1.GetOptions{})
+	if len(public.Spec.Template.Spec.ImagePullSecrets) != 0 {
+		t.Fatalf("public deployment should be untouched")
+	}
+	if _, err := cs.CoreV1().Secrets(testNS).Get(ctx, RegistryPullSecretName, metav1.GetOptions{}); err != nil {
+		t.Fatalf("pull secret missing: %v", err)
+	}
+}

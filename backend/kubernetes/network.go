@@ -13,14 +13,6 @@ import (
 	v1 "k8s.io/client-go/applyconfigurations/networking/v1"
 )
 
-// privateEgressExcept lists destination ranges tenant workloads must never
-// reach on their general outbound (80/443) rule: the link-local block
-// (169.254.0.0/16), which includes the cloud metadata endpoint, the CGNAT
-// block (100.64.0.0/10, e.g. Tailscale), and the RFC1918 private ranges,
-// which cover the Kubernetes API server, in-cluster Services (including other
-// tenants' workloads), the homelab LAN and the nodes themselves.
-// Egress to the public internet on 80/443 stays allowed; same-namespace
-// traffic and DNS are still permitted by the dedicated rules above.
 var privateEgressExcept = []string{
 	"169.254.0.0/16",
 	"10.0.0.0/8",

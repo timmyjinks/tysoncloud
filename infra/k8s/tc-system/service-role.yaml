@@ -57,7 +57,7 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments"]
     # update: volume attach/detach does Get + Update (kubernetes/volume.go).
-    verbs: ["get", "create", "update", "patch", "delete"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
   - apiGroups: ["autoscaling"]
     resources: ["horizontalpodautoscalers"]
     verbs: ["get", "create", "patch", "delete"]

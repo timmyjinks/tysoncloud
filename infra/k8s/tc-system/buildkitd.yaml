@@ -1,0 +1,233 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tc-build
+  labels:
+    app.kubernetes.io/part-of: tysoncloud
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: buildkit-ca
+  namespace: cert-manager
+spec:
+  isCA: true
+  commonName: tysoncloud-buildkit-ca
+  secretName: buildkit-ca-secret
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: selfsigned-bootstrap
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: buildkit-ca-issuer
+spec:
+  ca:
+    secretName: buildkit-ca-secret
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: buildkitd-server
+  namespace: tc-build
+spec:
+  secretName: buildkitd-server-tls
+  commonName: buildkitd.tc-build.svc.cluster.local
+  dnsNames:
+    - buildkitd.tc-build.svc.cluster.local
+    - buildkitd.tc-build.svc
+    - buildkitd.tc-build
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: buildkit-ca-issuer
+    kind: ClusterIssuer
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: buildkit-client
+  namespace: tc-system
+spec:
+  secretName: buildkit-client-tls
+  commonName: tysoncloud-backend
+  usages:
+    - client auth
+    - digital signature
+    - key encipherment
+  duration: 8760h
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: buildkit-ca-issuer
+    kind: ClusterIssuer
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: buildkitd
+  namespace: tc-build
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: buildkitd
+  namespace: tc-build
+  labels:
+    app: buildkitd
+  annotations:
+    secret.reloader.stakater.com/reload: buildkitd-server-tls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: buildkitd
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: buildkitd
+    spec:
+      serviceAccountName: buildkitd
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      containers:
+        - name: buildkitd
+          image: moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e
+          args:
+            - --addr
+            - tcp://0.0.0.0:1234
+            - --addr
+            - unix:///run/buildkit/buildkitd.sock
+            - --tlscacert
+            - /certs/ca.crt
+            - --tlscert
+            - /certs/tls.crt
+            - --tlskey
+            - /certs/tls.key
+          ports:
+            - containerPort: 1234
+              name: grpc
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command: ["buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          securityContext:
+            privileged: true
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2000m
+              memory: 5Gi
+          volumeMounts:
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/buildkit
+      volumes:
+        - name: tls
+          secret:
+            secretName: buildkitd-server-tls
+            defaultMode: 0400
+        - name: state
+          emptyDir:
+            sizeLimit: 30Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: buildkitd
+  namespace: tc-build
+  labels:
+    app: buildkitd
+spec:
+  selector:
+    app: buildkitd
+  ports:
+    - name: grpc
+      port: 1234
+      targetPort: 1234
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: buildkitd
+  namespace: tc-build
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tc-system
+          podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values: ["tysoncloud-backend", "tysoncloud-backend-dev"]
+      ports:
+        - port: 1234
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tc-system
+          podSelector:
+            matchLabels:
+              app: registry
+      ports:
+        - port: 5000
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 100.64.0.0/10

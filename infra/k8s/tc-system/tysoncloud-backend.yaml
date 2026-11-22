@@ -51,16 +51,47 @@ spec:
         app: tysoncloud-backend
     spec:
       serviceAccountName: tysoncloud-backend
+      securityContext:
+        fsGroup: 65532
+      volumes:
+        - name: buildkit-tls
+          secret:
+            secretName: buildkit-client-tls
+            defaultMode: 0440
+        - name: registry-auth
+          secret:
+            secretName: registry-auth
+            defaultMode: 0440
+            items:
+              - key: .dockerconfigjson
+                path: config.json
       containers:
         - name: tysoncloud-backend
           image: ghcr.io/timmyjinks/tysoncloud-backend:sha-1ec07ad603466e913ed40abb1c106992461b9acc
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: buildkit-tls
+              mountPath: /etc/tysoncloud/buildkit-tls
+              readOnly: true
+            - name: registry-auth
+              mountPath: /etc/tysoncloud/registry-auth
+              readOnly: true
           env:
             - name: REGISTRY_URL
               value: 10.43.208.127:5000
             - name: BUILDKIT_HOST
-              value: tcp://localhost:1234
+              value: tcp://buildkitd.tc-build.svc.cluster.local:1234
+            - name: BUILDKIT_TLS_CA_CERT
+              value: /etc/tysoncloud/buildkit-tls/ca.crt
+            - name: BUILDKIT_TLS_CERT
+              value: /etc/tysoncloud/buildkit-tls/tls.crt
+            - name: BUILDKIT_TLS_KEY
+              value: /etc/tysoncloud/buildkit-tls/tls.key
+            - name: BUILDKIT_TLS_SERVER_NAME
+              value: buildkitd.tc-build.svc.cluster.local
+            - name: REGISTRY_DOCKER_CONFIG
+              value: /etc/tysoncloud/registry-auth
             - name: REGISTRY_INSECURE
               value: "true"
             - name: ALLOWED_ORIGINS
@@ -114,27 +145,3 @@ spec:
                   key: GITHUB_APP_CLIENT_SECRET
                   name: tysoncloud-backend
                   optional: true
-        - name: buildkitd
-          # Pinned to match the buildctl client in backend/cmd/deploy/Dockerfile.
-          image: moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e
-          args:
-            # Loopback only: the API container shares the pod network
-            # namespace, nothing else in the cluster can reach buildkitd.
-            - --addr
-            - tcp://127.0.0.1:1234
-            - --addr
-            - unix:///run/buildkit/buildkitd.sock
-          readinessProbe:
-            exec:
-              command: ["buildctl", "--addr", "unix:///run/buildkit/buildkitd.sock", "debug", "workers"]
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          securityContext:
-            privileged: true
-          resources:
-            requests:
-              cpu: 100m
-              memory: 256Mi
-            limits:
-              cpu: 1000m
-              memory: 1Gi

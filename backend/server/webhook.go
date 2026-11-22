@@ -422,14 +422,13 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			}
 			go app.deployPRPreview(svc, conn.InstallationId, accessToken, payload.Repository.Id, headCloneURL, headRef, headSHA, repoFullName, prNumber)
 		}
-		previewNamespace := util.PreviewNamespaceForRepo(payload.Repository.Id, prNumber)
 		copied := map[string]bool{}
 		for _, svc := range services {
 			if svc.GithubConnectionId != conn.Id || copied[svc.ProjectId] {
 				continue
 			}
 			copied[svc.ProjectId] = true
-			go app.copyProjectToPreview(svc.ProjectId, payload.Repository.Id, prNumber, previewNamespace)
+			go app.copyProjectToPreview(svc.ProjectId, payload.Repository.Id, prNumber)
 		}
 		w.WriteHeader(http.StatusOK)
 		return
@@ -540,14 +539,13 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			}
 			go app.deployPRPreview(svc, cconn.InstallationId, ctoken, crepoId, cheadCloneURL, cheadRef, cheadSHA, crepoFull, cpr)
 		}
-		cpreviewNamespace := util.PreviewNamespaceForRepo(crepoId, cpr)
 		ccopied := map[string]bool{}
 		for _, svc := range cservices {
 			if svc.GithubConnectionId != cconn.Id || ccopied[svc.ProjectId] {
 				continue
 			}
 			ccopied[svc.ProjectId] = true
-			go app.copyProjectToPreview(svc.ProjectId, crepoId, cpr, cpreviewNamespace)
+			go app.copyProjectToPreview(svc.ProjectId, crepoId, cpr)
 		}
 		w.WriteHeader(http.StatusOK)
 		return
@@ -823,7 +821,7 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		return
 	}
 
-	previewNamespace := util.PreviewNamespaceForRepo(repoId, prNumber)
+	previewNamespace := app.previewNamespaceFor(svc.ProjectId, prNumber)
 	previewName := util.PreviewResourceName(copy.ResourceName, prNumber)
 	hostname := util.PreviewHostname(copy.Id, prNumber)
 	previewURL := "https://" + hostname
@@ -967,9 +965,20 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 	slog.Info("preview deploy: running", "copy_id", copy.Id, "pr", prNumber, "preview", previewName, "namespace", previewNamespace, "url", previewURL, "image", builtImage)
 }
 
-func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int64, prNumber int, previewNamespace string) {
+// previewNamespaceFor returns the namespace for a project's preview of a PR.
+// An existing environment's stored namespace wins (older previews used a
+// repo-keyed namespace); otherwise the per-project namespace is used.
+func (app *Application) previewNamespaceFor(projectId string, prNumber int) string {
+	if env, err := app.Supabase.GetPreviewEnvironmentByProjectPR(projectId, prNumber); err == nil && strings.TrimSpace(env.Namespace) != "" {
+		return env.Namespace
+	}
+	return util.PreviewNamespaceForProject(projectId, prNumber)
+}
+
+func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int64, prNumber int) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+	previewNamespace := app.previewNamespaceFor(projectId, prNumber)
 
 	ownerId, err := app.Supabase.GetProjectOwnerId(projectId)
 	if err != nil {
@@ -1124,9 +1133,6 @@ func (app *Application) cleanupPRPreviews(installationId string, repoId int64, r
 			continue
 		}
 		namespaces[v.Environment.Namespace] = true
-	}
-	if len(namespaces) == 0 {
-		namespaces[util.PreviewNamespaceForRepo(repoId, prNumber)] = true
 	}
 	for namespace := range namespaces {
 		if err := app.Deploy.DeleteProject(ctx, namespace); err != nil {

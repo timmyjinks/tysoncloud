@@ -68,22 +68,26 @@ func PreviewResourceName(resourceName string, prNumber int) string {
 	return base + suffix
 }
 
-func PreviewNamespaceForRepo(repoID int64, prNumber int) string {
-	ns := fmt.Sprintf("prev-r%d-pr-%d", repoID, prNumber)
-	if len(ns) > 63 {
-		ns = strings.Trim(ns[:63], "-")
+// PreviewNamespaceForProject returns the per-project, per-PR preview namespace.
+// It embeds the full project UUID (32 hex chars, dashes stripped) so distinct
+// projects can never collide: "prev-" + 32 + "-pr-" + up to 10 digits < 63.
+func PreviewNamespaceForProject(projectID string, prNumber int) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(projectID) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
 	}
-	return ns
-}
-
-// Deprecated: use PreviewNamespaceForRepo.
-func PreviewNamespace(serviceID string, prNumber int) string {
-	base := fmt.Sprintf("prev-%s", ShortServiceID(serviceID))
+	id := b.String()
+	if id == "" {
+		id = "unknown"
+	}
 	suffix := fmt.Sprintf("-pr-%d", prNumber)
-	if len(base)+len(suffix) > 63 {
-		base = strings.Trim(base[:63-len(suffix)], "-")
+	const prefix = "prev-"
+	if max := 63 - len(prefix) - len(suffix); len(id) > max {
+		id = id[:max]
 	}
-	return base + suffix
+	return prefix + id + suffix
 }
 
 func PreviewHostname(serviceID string, prNumber int) string {

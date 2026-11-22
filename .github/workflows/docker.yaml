@@ -12,7 +12,6 @@ on:
       - .github/workflows/docker.yaml
   workflow_dispatch:
 
-# Read-only by default; jobs that push images or commit manifests opt in.
 permissions:
   contents: read
 
@@ -36,13 +35,11 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -50,7 +47,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.BACKEND_IMAGE }}
           tags: |
@@ -62,20 +59,15 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push backend
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@v6
         with:
           context: ./backend
           file: ./backend/cmd/deploy/Dockerfile
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha,scope=backend-main
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max,scope=backend-main
-            type=registry,ref=${{ env.BACKEND_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=backend-main
+          cache-to: type=gha,mode=max,scope=backend-main
           provenance: true
 
   build-frontend:
@@ -85,13 +77,11 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        uses: actions/checkout@v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        uses: docker/setup-buildx-action@v3
       - name: Log in to GHCR
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -99,7 +89,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.FRONTEND_IMAGE }}
           tags: |
@@ -111,20 +101,15 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push frontend
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        uses: docker/build-push-action@v6
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
-          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha,scope=frontend-main
-            type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache
-          cache-to: |
-            type=gha,mode=max,scope=frontend-main
-            type=registry,ref=${{ env.FRONTEND_IMAGE }}:buildcache,mode=max
+          cache-from: type=gha,scope=frontend-main
+          cache-to: type=gha,mode=max,scope=frontend-main
           provenance: true
 
   migrate:
@@ -140,7 +125,6 @@ jobs:
         with:
           version: 2.120.0
 
-      # Runs before update-manifests so Flux never rolls out code ahead of its schema.
       - name: Apply migrations
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -153,7 +137,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
@@ -166,11 +150,6 @@ jobs:
           set -e
           echo "Event: ${{ github.event_name }} ref: ${{ github.ref }} sha: $SHA"
 
-          # metadata-action creates tags:
-          # - ghcr.io/timmyjinks/tysoncloud-backend:sha-<full-sha>
-          # - ghcr.io/timmyjinks/tysoncloud-backend:latest (on main)
-          # - ghcr.io/timmyjinks/tysoncloud-backend:<branch>-<sha> (via type=ref)
-          # We use the deterministic sha tag for GitOps.
           BACKEND_TAG="sha-${SHA}"
           FRONTEND_TAG="sha-${SHA}"
 
@@ -181,8 +160,6 @@ jobs:
             image="$2"
             tag="$3"
             echo "Updating $file -> $image:$tag"
-            # Replace image line, preserving yaml structure
-            # Matches: image: ghcr.io/timmyjinks/tysoncloud-backend[:tag]
             sed -i -E "s|image: ${image}.*|image: ${image}:${tag}|g" "$file"
             grep -q "image: ${image}:${tag}" "$file" && echo "  OK" || (echo "  FAILED for $file" && cat "$file" && exit 1)
           }
@@ -213,7 +190,6 @@ jobs:
 
           git add infra/k8s/tc-system/tysoncloud-backend.yaml infra/k8s/tc-system/tysoncloud-frontend.yaml infra/k8s/tc-system/tysoncloud-backend-dev.yaml infra/k8s/tc-system/tysoncloud-frontend-dev.yaml
 
-          # Only commit if staged changes exist
           if git diff --cached --quiet; then
             echo "No staged changes"
             exit 0

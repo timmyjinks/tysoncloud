@@ -43,10 +43,6 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 					ContainerPort: &resource.Port,
 				},
 			},
-			// The pod runs in its own user namespace (HostUsers below), so
-			// root and the default capability set only apply inside it.
-			// They stay allowed because many images chown/setuid at start;
-			// escalation, raw sockets and device creation are still not.
 			SecurityContext: &appcorev1.SecurityContextApplyConfiguration{
 				AllowPrivilegeEscalation: util.BoolPtr(false),
 				Privileged:               util.BoolPtr(false),
@@ -85,26 +81,13 @@ func (d *KubernetesService) CreateDeployment(ctx context.Context, resource Resou
 					"app": resource.Name,
 				},
 				Annotations: map[string]string{
-					// Same mechanism as `kubectl rollout restart`: any
-					// Apply changes the template, so k8s rolls new pods
-					// that read the current Secret at start. Without this,
-					// secret-only changes Apply an identical template and
-					// old pods keep stale env.
 					"kubectl.kubernetes.io/restartedAt": time.Now().UTC().Format(time.RFC3339),
 				},
 			},
 			Spec: &appcorev1.PodSpecApplyConfiguration{
-				Containers: container,
-				// Tenant workloads never need to talk to the Kubernetes API.
+				Containers:                   container,
 				AutomountServiceAccountToken: util.BoolPtr(false),
-				// Tenant images are arbitrary and most expect to start as
-				// root, so instead of forcing a UID (which breaks stock
-				// images like nginx) give each pod its own user namespace:
-				// container UIDs, root included, map to an unused,
-				// unprivileged UID range on the node.
-				HostUsers: util.BoolPtr(false),
-				// Lets images that set a non-root USER still listen on :80.
-				// Scoped to the pod's own network namespace.
+				HostUsers:                    util.BoolPtr(false),
 				SecurityContext: &appcorev1.PodSecurityContextApplyConfiguration{
 					Sysctls: []appcorev1.SysctlApplyConfiguration{
 						{

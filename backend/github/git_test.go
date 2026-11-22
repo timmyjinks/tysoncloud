@@ -38,8 +38,6 @@ func TestGitAuthEnv(t *testing.T) {
 	}
 }
 
-// The clone must not persist the token anywhere in the build context, and
-// stripGitDir must leave only the working tree.
 func TestCloneKeepsTokenOutOfBuildContext(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not installed")

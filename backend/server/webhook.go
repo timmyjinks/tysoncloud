@@ -145,8 +145,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Build in the background: GitHub drops deliveries after 10s, which
-		// would cancel r.Context() mid-build (or while queued for a slot).
 		go func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			defer cancel()
@@ -386,8 +384,6 @@ func (app *Application) GithubWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// head.repo is null once a fork is deleted, but GitHub still serves
-		// the PR's commits from the base repo, so an empty head is a fork.
 		headRepo := strings.TrimSpace(payload.PullRequest.Head.Repo.FullName)
 		if util.IsForkPR(headRepo, payload.Repository.FullName) {
 			slog.Warn("preview deploy: skipping fork or unknown-head PR", "repo_id", payload.Repository.Id, "head_repo", headRepo, "pr", payload.Number)
@@ -791,7 +787,6 @@ func (app *Application) postPreviewForkNotice(ctx context.Context, token, repoFu
 	})
 }
 
-// postPreviewNotice posts a one-off main comment unless one already exists.
 func (app *Application) postPreviewNotice(ctx context.Context, token, repoFullName string, repoId int64, prNumber int, kind string, render func(marker string) string) {
 	if token == "" || repoFullName == "" {
 		return
@@ -905,8 +900,6 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 		refreshMainWithError(envErr.Error())
 		return
 	}
-	// Preserve preview edits: overlay live preview env on top of base.
-	// GetSecret returns empty map (not error) when missing = first deploy.
 	liveEnvStr, _ := app.Deploy.GetServiceEnv(ctx, deploy.Service{
 		Namespace: previewNamespace,
 		Name:      previewName,
@@ -985,7 +978,6 @@ func (app *Application) copyProjectToPreview(projectId string, excludeRepoId int
 		slog.Warn("preview copy: failed to ensure preview env", "project_id", projectId, "pr", prNumber, "err", err)
 		return
 	}
-	// Lists below include copy rows too — skip them so we only copy prod.
 	copies, err := app.Supabase.GetPreviewCopyIDs(projectId)
 	if err != nil {
 		slog.Warn("preview copy: copy lookup failed", "project_id", projectId, "pr", prNumber, "err", err)

@@ -23,7 +23,6 @@ type ServicesTable struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-// IsProductionRow reports whether a service row should be treated as prod.
 func IsProductionRow(p *bool) bool {
 	return p == nil || *p
 }
@@ -203,8 +202,6 @@ func (s *SupabaseStore) DeleteService(id, userId string) error {
 	return nil
 }
 
-// GetProductionServices returns only prod rows, excluding preview copies
-// tracked in preview_environment_services.
 func (s *SupabaseStore) GetProductionServices(projectId, userId string) ([]ServicesTable, error) {
 	services, err := s.GetServices(projectId, userId)
 	if err != nil {

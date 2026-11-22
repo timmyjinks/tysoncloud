@@ -11,8 +11,6 @@ import (
 
 const rateLimiterIdleTTL = 10 * time.Minute
 
-// rateLimiter hands out one token bucket per key (a Clerk user id) and
-// forgets keys idle for rateLimiterIdleTTL.
 type rateLimiter struct {
 	mu        sync.Mutex
 	limit     rate.Limit
@@ -58,8 +56,6 @@ func writeRateLimited(w http.ResponseWriter) {
 	writeError(w, http.StatusTooManyRequests, "You're making requests too quickly. Please wait a moment and try again.", nil)
 }
 
-// perUser limits authenticated requests per Clerk user. It must run after
-// Clerk's header-auth middleware.
 func (rl *rateLimiter) perUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := clerk.SessionClaimsFromContext(r.Context())

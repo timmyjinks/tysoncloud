@@ -10,7 +10,5 @@ func ServiceToResource(service Service) kubernetes.Resource {
 		Env:       service.Env,
 		Image:     service.Image,
 		Port:      service.Port,
-		// StorageGB: service.Volume.StorageGB,
-		// MountPath: service.Volume.MountPath,
 	}
 }

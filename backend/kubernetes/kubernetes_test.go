@@ -232,9 +232,6 @@ func TestCreateNetworkPolicy(t *testing.T) {
 		t.Fatalf("ingress namespace = %q, want tc-system", got)
 	}
 
-	// The public-internet egress rule (80/443) must be constrained to an
-	// IPBlock that excludes link-local and RFC1918, so tenants can't reach
-	// the metadata endpoint, the API server or other in-cluster Services.
 	var publicEgress *netv1.NetworkPolicyEgressRule
 	for i := range main.Spec.Egress {
 		e := &main.Spec.Egress[i]

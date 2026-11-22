@@ -13,8 +13,6 @@ import (
 
 const tenantLimitsName = "tysoncloud-tenant-limits"
 
-// tenantQuota caps what a single project namespace can consume so one tenant
-// can't exhaust the cluster.
 var tenantQuota = corev1.ResourceList{
 	corev1.ResourceLimitsCPU:              resourcev1.MustParse("8"),
 	corev1.ResourceLimitsMemory:           resourcev1.MustParse("16Gi"),
@@ -46,8 +44,6 @@ func (d *KubernetesService) CreateResourceQuota(ctx context.Context, namespace s
 	return err
 }
 
-// CreateLimitRange gives containers without explicit resources (e.g. CNPG
-// instances) defaults, which the quota above requires.
 func (d *KubernetesService) CreateLimitRange(ctx context.Context, namespace string) error {
 	containerType := corev1.LimitTypeContainer
 	_, err := d.clientset.CoreV1().LimitRanges(namespace).Apply(ctx, &appcorev1.LimitRangeApplyConfiguration{

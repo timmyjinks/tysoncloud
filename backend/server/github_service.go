@@ -460,7 +460,6 @@ func (app *Application) UpdateGithubService(w http.ResponseWriter, r *http.Reque
 	}
 
 	if sanitizedBranch != nil && *sanitizedBranch != oldBranch {
-		// Branch changed: rebuild from git asynchronously, like creation.
 		connection, connErr := app.Supabase.GetGithubConnection(userId)
 		if connErr != nil {
 			writeError(w, http.StatusInternalServerError, "We saved your changes, but couldn't rebuild from the new branch. Use Redeploy to retry.", connErr)
@@ -567,8 +566,6 @@ func (app *Application) buildGithubServiceFromGit(userId string, svc store.Githu
 	registryURL := app.Github.RegistryURL()
 	imageTag := app.Github.RegistryTag(registryURL, svc.ResourceName, "latest")
 
-	// Resolve the effective env BEFORE the build so the image bakes the same
-	// vars it runs with. Ephemeral — never stored beyond the K8s secret.
 	buildEnv := util.ParseEnv(envStr)
 	if strings.TrimSpace(envStr) == "" {
 		if existingEnv, envErr := app.Deploy.GetServiceEnv(buildCtx, deploy.Service{

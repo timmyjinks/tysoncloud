@@ -85,7 +85,6 @@ func (app *Application) CreateGithubConnection(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Services detached by an earlier uninstall resume push builds once relinked.
 	if err := app.Supabase.RelinkGithubServices(claims.Subject, conn.Id); err != nil {
 		slog.Error("CreateGithubConnection: relink detached services failed", "user_id", claims.Subject, "connection_id", conn.Id, "err", err)
 	}

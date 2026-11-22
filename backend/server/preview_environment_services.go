@@ -190,9 +190,6 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 	if req.Port != nil {
 		port = *req.Port
 	}
-	// Same as normal services: deploy with the image from the source of
-	// truth (prod), not the stale live deployment — the image change is
-	// what rolls the pods. Port stays preview-owned.
 	image := ""
 	if child.SourceType == "service" {
 		baseName := strings.TrimSuffix(src.Name, fmt.Sprintf("-pr-%d", env.Pr))
@@ -216,10 +213,6 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 			image = copyRow.Image
 		}
 	} else {
-		// Github copies have no image column in the DB. Reconstruct the exact
-		// PR-built tag from stored fields (prod resource name + live PR head
-		// SHA) so a port/env edit never rolls the preview back to :latest
-		// and never reads the live deployment image.
 		image = app.previewGithubImage(ctx, claims.Subject, src, env)
 		if image == "" {
 			image = app.Github.RegistryTag(app.Github.RegistryURL(), src.ResourceName, "latest")
@@ -264,10 +257,6 @@ func (app *Application) UpdatePreviewEnvironmentService(w http.ResponseWriter, r
 	}
 }
 
-// previewGithubImage reconstructs the PR-built registry tag for a github
-// preview copy from stored fields: the prod service's resource name plus the
-// live PR head SHA. Empty string when it can't be resolved; callers fall back
-// to the :latest tag.
 func (app *Application) previewGithubImage(ctx context.Context, userId string, src store.PreviewEnvironmentSource, env store.PreviewEnvironment) string {
 	baseName := strings.TrimSuffix(src.Name, fmt.Sprintf("-pr-%d", env.Pr))
 	prods, err := app.Supabase.GetProductionGithubServices(src.ProjectId, userId)
@@ -299,9 +288,6 @@ func (app *Application) previewGithubImage(ctx context.Context, userId string, s
 	return app.Github.RegistryTag(app.Github.RegistryURL(), prodResourceName, fmt.Sprintf("pr-%d-%s", env.Pr, util.ShortSHA(sha)))
 }
 
-// DeletePreviewEnvironmentService removes a single preview copy: its infra in
-// the preview namespace, its environment mapping and its copy row. Prod
-// handlers stay prod-only; preview deletes go here.
 func (app *Application) DeletePreviewEnvironmentService(w http.ResponseWriter, r *http.Request) {
 	claims, ok := clerk.SessionClaimsFromContext(r.Context())
 	if !ok {
@@ -384,9 +370,6 @@ func (app *Application) DeletePreviewEnvironmentService(w http.ResponseWriter, r
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetPreviewEnvironmentServiceLogs streams logs for a single preview copy:
-// build logs while pre-deploy, otherwise the workload logs in the preview
-// namespace. Prod log handlers stay prod-only; preview logs go here.
 func (app *Application) GetPreviewEnvironmentServiceLogs(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectId := vars["project_id"]

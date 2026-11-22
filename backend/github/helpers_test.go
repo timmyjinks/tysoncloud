@@ -78,7 +78,6 @@ func TestGenerateAppJWT(t *testing.T) {
 		t.Fatal(err)
 	}
 	pemKey := string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}))
-	// Env files store the key on one line with literal \n.
 	escaped := strings.ReplaceAll(pemKey, "\n", `\n`)
 
 	s := NewService(config.Github{AppID: "12345", AppPrivateKey: escaped}, config.Registry{})
@@ -133,7 +132,7 @@ func TestResolveBuildContext(t *testing.T) {
 func TestBuildLogStore(t *testing.T) {
 	s := NewBuildLogStore()
 	s.Append("svc", "first")
-	s.Append("svc", "") // ignored
+	s.Append("svc", "")
 
 	id, ch, snap := s.Subscribe("svc")
 	if !reflect.DeepEqual(snap, []string{"first"}) {
@@ -156,8 +155,8 @@ func TestBuildLogStore(t *testing.T) {
 	if _, ok := <-ch; ok {
 		t.Fatalf("channel not closed after unsubscribe")
 	}
-	s.Unsubscribe("svc", id)     // double unsubscribe is a no-op
-	s.Unsubscribe("missing", 99) // unknown service is a no-op
+	s.Unsubscribe("svc", id)
+	s.Unsubscribe("missing", 99)
 }
 
 func TestBuildLogStoreCapsHistory(t *testing.T) {
@@ -176,14 +175,14 @@ func TestBuildLogStoreCapsHistory(t *testing.T) {
 
 func TestBuildLogStoreSlowSubscriberDoesNotBlock(t *testing.T) {
 	s := NewBuildLogStore()
-	s.Subscribe("svc") // never drained
+	s.Subscribe("svc")
 	for i := range 200 {
 		s.Append("svc", fmt.Sprintf("line %d", i))
 	}
 }
 
 func TestServiceBuildLogsLazyInit(t *testing.T) {
-	var s Service // zero value: logs is nil
+	var s Service
 	s.UnsubscribeBuildLogs("svc", 0)
 	s.AppendBuildLog("svc", "hello")
 	_, _, snap := s.SubscribeBuildLogs("svc")

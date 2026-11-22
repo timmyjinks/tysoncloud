@@ -7,7 +7,6 @@ type Service struct {
 	Env       map[string][]byte
 	Image     string
 	Port      int32
-	// Volume    *Volume
 }
 
 type Volume struct {

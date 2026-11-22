@@ -253,7 +253,7 @@ func TestPreviewErrorRegistry(t *testing.T) {
 	})
 
 	recordPreviewError(repo, pr, "a", "  build failed  ")
-	recordPreviewError(repo, pr, "b", "   ") // blank errors are ignored
+	recordPreviewError(repo, pr, "b", "   ")
 	recordPreviewError(repo, pr+1, "b", "other pr")
 
 	got := snapshotPreviewErrors(repo, pr, views)

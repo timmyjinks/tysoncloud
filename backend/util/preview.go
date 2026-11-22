@@ -2,22 +2,16 @@ package util
 
 import "fmt"
 
-// PreviewURLKey is forced into every preview's env.
 const PreviewURLKey = "PREVIEW_URL"
 
-// PreviewServiceTarget resolves k8s namespace/name/hostname for a preview copy.
 func PreviewServiceTarget(resourceName, sourceID, namespace string, pr int) (outNamespace, name, hostname string) {
 	return namespace, PreviewResourceName(resourceName, pr), PreviewHostname(sourceID, pr)
 }
 
-// PreviewBuildLogID matches the id used when streaming preview builds
-// (see webhook deployPreview: previewLogID = copyID-pr-N).
 func PreviewBuildLogID(copyID string, pr int) string {
 	return fmt.Sprintf("%s-pr-%d", copyID, pr)
 }
 
-// PreviewSecretName returns the secret name for a preview workload.
-// Databases store connection details under "<name>-app".
 func PreviewSecretName(sourceType, previewName string) string {
 	if sourceType == "database" {
 		return previewName + "-app"
@@ -25,9 +19,6 @@ func PreviewSecretName(sourceType, previewName string) string {
 	return previewName
 }
 
-// MergePreviewServiceEnv preserves preview edits across redeploys: start from base,
-// overlay live preview keys, force preview URL. First deploy (live empty)
-// is just base + preview URL.
 func MergePreviewServiceEnv(base, live map[string]string, previewURL string) map[string][]byte {
 	merged := map[string][]byte{}
 	for k, v := range base {
@@ -45,7 +36,6 @@ func MergePreviewServiceEnv(base, live map[string]string, previewURL string) map
 	return merged
 }
 
-// FilterPreviewCopies drops rows tracked as preview copies.
 func FilterPreviewCopies[T any](items []T, idOf func(T) string, copies map[string]bool) []T {
 	kept := make([]T, 0, len(items))
 	for _, it := range items {

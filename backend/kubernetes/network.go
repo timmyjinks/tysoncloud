@@ -15,9 +15,10 @@ import (
 
 // privateEgressExcept lists destination ranges tenant workloads must never
 // reach on their general outbound (80/443) rule: the link-local block
-// (169.254.0.0/16), which includes the cloud metadata endpoint, and the
-// RFC1918 private ranges, which cover the Kubernetes API server, in-cluster
-// Services (including other tenants' workloads) and the nodes themselves.
+// (169.254.0.0/16), which includes the cloud metadata endpoint, the CGNAT
+// block (100.64.0.0/10, e.g. Tailscale), and the RFC1918 private ranges,
+// which cover the Kubernetes API server, in-cluster Services (including other
+// tenants' workloads), the homelab LAN and the nodes themselves.
 // Egress to the public internet on 80/443 stays allowed; same-namespace
 // traffic and DNS are still permitted by the dedicated rules above.
 var privateEgressExcept = []string{
@@ -25,6 +26,7 @@ var privateEgressExcept = []string{
 	"10.0.0.0/8",
 	"172.16.0.0/12",
 	"192.168.0.0/16",
+	"100.64.0.0/10",
 }
 
 func (d *KubernetesService) CreateNetworkPolicy(ctx context.Context, namespace, clusterIP string) error {

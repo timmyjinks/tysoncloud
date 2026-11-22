@@ -44,18 +44,25 @@ spec:
               value: /var/lib/registry
             - name: REGISTRY_STORAGE_DELETE_ENABLED
               value: "true"
+            - name: REGISTRY_AUTH
+              value: htpasswd
+            - name: REGISTRY_AUTH_HTPASSWD_REALM
+              value: tysoncloud-registry
+            - name: REGISTRY_AUTH_HTPASSWD_PATH
+              value: /auth/htpasswd
           volumeMounts:
             - name: data
               mountPath: /var/lib/registry
+            - name: htpasswd
+              mountPath: /auth
+              readOnly: true
           livenessProbe:
-            httpGet:
-              path: /v2/
+            tcpSocket:
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /v2/
+            tcpSocket:
               port: 5000
             initialDelaySeconds: 5
             periodSeconds: 5
@@ -70,6 +77,12 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: registry-data
+        - name: htpasswd
+          secret:
+            secretName: registry-htpasswd
+            items:
+              - key: htpasswd
+                path: htpasswd
 ---
 apiVersion: v1
 kind: Service
@@ -100,23 +113,12 @@ spec:
     - Ingress
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              app: tysoncloud-backend
-      ports:
-        - port: 5000
-          protocol: TCP
-    - from:
-        - podSelector:
-            matchLabels:
-              app: tysoncloud-backend-dev
-      ports:
-        - port: 5000
-          protocol: TCP
-    - from:
         - namespaceSelector:
             matchLabels:
-              managed-by: tysoncloud
+              kubernetes.io/metadata.name: tc-build
+          podSelector:
+            matchLabels:
+              app: buildkitd
       ports:
         - port: 5000
           protocol: TCP

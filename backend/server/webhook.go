@@ -965,9 +965,6 @@ func (app *Application) deployPRPreview(svc store.GithubServicesTable, installat
 	slog.Info("preview deploy: running", "copy_id", copy.Id, "pr", prNumber, "preview", previewName, "namespace", previewNamespace, "url", previewURL, "image", builtImage)
 }
 
-// previewNamespaceFor returns the namespace for a project's preview of a PR.
-// An existing environment's stored namespace wins (older previews used a
-// repo-keyed namespace); otherwise the per-project namespace is used.
 func (app *Application) previewNamespaceFor(projectId string, prNumber int) string {
 	if env, err := app.Supabase.GetPreviewEnvironmentByProjectPR(projectId, prNumber); err == nil && strings.TrimSpace(env.Namespace) != "" {
 		return env.Namespace

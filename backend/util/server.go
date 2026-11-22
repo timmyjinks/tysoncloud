@@ -68,9 +68,6 @@ func PreviewResourceName(resourceName string, prNumber int) string {
 	return base + suffix
 }
 
-// PreviewNamespaceForProject returns the per-project, per-PR preview namespace.
-// It embeds the full project UUID (32 hex chars, dashes stripped) so distinct
-// projects can never collide: "prev-" + 32 + "-pr-" + up to 10 digits < 63.
 func PreviewNamespaceForProject(projectID string, prNumber int) string {
 	var b strings.Builder
 	for _, r := range strings.ToLower(projectID) {

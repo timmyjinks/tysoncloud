@@ -115,7 +115,6 @@ spec:
                   name: tysoncloud-backend
                   optional: true
         - name: buildkitd
-          # Pinned to match the buildctl client in backend/cmd/deploy/Dockerfile.
           image: moby/buildkit:v0.23.2@sha256:ddd1ca44b21eda906e81ab14a3d467fa6c39cd73b9a39df1196210edcb8db59e
           args:
             # Loopback only: the API container shares the pod network

@@ -253,7 +253,7 @@ func TestCreateNetworkPolicy(t *testing.T) {
 	if publicEgress.To[0].IPBlock.CIDR != "0.0.0.0/0" {
 		t.Fatalf("public egress CIDR = %q, want 0.0.0.0/0", publicEgress.To[0].IPBlock.CIDR)
 	}
-	for _, want := range []string{"169.254.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"} {
+	for _, want := range []string{"169.254.0.0/16", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"} {
 		if !slices.Contains(publicEgress.To[0].IPBlock.Except, want) {
 			t.Fatalf("public egress except %v missing %s", publicEgress.To[0].IPBlock.Except, want)
 		}

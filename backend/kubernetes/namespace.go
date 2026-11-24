@@ -18,11 +18,7 @@ func (d *KubernetesService) CreateNamespace(ctx context.Context, namespace strin
 		ObjectMetaApplyConfiguration: &appmetav1.ObjectMetaApplyConfiguration{
 			Name: util.StringPtr(namespace),
 			Labels: map[string]string{
-				"managed-by": "tysoncloud",
-				// Pod Security Admission: block privileged/host-level pods
-				// in tenant namespaces, and surface anything that misses
-				// the stricter "restricted" profile. Tenant pods run as
-				// root inside a user namespace, which "restricted" rejects.
+				"managed-by":                         "tysoncloud",
 				"pod-security.kubernetes.io/enforce": "baseline",
 				"pod-security.kubernetes.io/warn":    "restricted",
 				"pod-security.kubernetes.io/audit":   "restricted",
@@ -41,8 +37,6 @@ func (d *KubernetesService) DeleteNamespace(ctx context.Context, namespace strin
 	return d.clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
 }
 
-// ListManagedNamespaces returns every namespace created by tysoncloud
-// (project and preview namespaces).
 func (d *KubernetesService) ListManagedNamespaces(ctx context.Context) ([]string, error) {
 	list, err := d.clientset.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		LabelSelector: "managed-by=tysoncloud",

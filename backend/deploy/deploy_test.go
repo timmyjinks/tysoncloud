@@ -78,7 +78,6 @@ func TestCreateServiceWithoutEnvRemovesSecret(t *testing.T) {
 		t.Fatalf("stale secret not removed when env is empty")
 	}
 
-	// No secret to delete the second time around must not fail.
 	if err := d.CreateService(ctx, Service{Namespace: testNS, Name: "web", Image: "nginx", Port: 80}); err != nil {
 		t.Fatalf("CreateService with no existing secret: %v", err)
 	}

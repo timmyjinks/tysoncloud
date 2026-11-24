@@ -44,8 +44,6 @@ func NewService(cfg config.Github, reg config.Registry) *Service {
 	return &Service{cfg: cfg, reg: reg, logs: NewBuildLogStore(), builds: make(chan struct{}, slots)}
 }
 
-// acquireBuildSlot blocks until one of the MaxConcurrentBuilds slots is free
-// (or ctx ends), so floods of pushes/PRs queue instead of exhausting BuildKit.
 func (s *Service) acquireBuildSlot(ctx context.Context, emit func(string)) (func(), error) {
 	select {
 	case s.builds <- struct{}{}:
@@ -164,14 +162,8 @@ func (s *Service) GetInstallationToken(ctx context.Context, installationId strin
 	return out.Token, nil
 }
 
-// ErrInstallationNotOwned is returned when the GitHub user who completed the
-// install flow cannot access the installation they are trying to connect.
 var ErrInstallationNotOwned = errors.New("github installation is not accessible to this user")
 
-// VerifyUserInstallation proves that the GitHub user who completed the app
-// install flow can access installationId. code is the user-authorization code
-// GitHub appends to the setup URL when "Request user authorization (OAuth)
-// during installation" is enabled on the app.
 func (s *Service) VerifyUserInstallation(ctx context.Context, code string, installationId int64) error {
 	if s.cfg.ClientID == "" || s.cfg.ClientSecret == "" {
 		return fmt.Errorf("github app oauth not configured: set GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET")
@@ -248,7 +240,6 @@ func (s *Service) exchangeUserCode(ctx context.Context, code string) (string, er
 		return "", fmt.Errorf("github code exchange: %w", err)
 	}
 	if out.AccessToken == "" {
-		// Expired, reused, or forged codes all land here.
 		return "", fmt.Errorf("%w: code exchange failed: %s", ErrInstallationNotOwned, out.Error)
 	}
 	return out.AccessToken, nil
@@ -288,9 +279,6 @@ func (s *Service) CloneAndBuild(ctx context.Context, cloneURL, accessToken, root
 
 var envKeyRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
-// railpackEnvArgs passes only env names to `railpack prepare`; railpack reads
-// each value from the process environment (see exportEnv), so secret values
-// never appear on argv where any process on the node can read them.
 func railpackEnvArgs(env map[string][]byte) []string {
 	keys := railpackEnvKeys(env)
 	if len(keys) == 0 {
@@ -303,19 +291,10 @@ func railpackEnvArgs(env map[string][]byte) []string {
 	return args
 }
 
-// railpackFrontendImage is the BuildKit frontend that executes railpack plans.
-// Keep its version in sync with RAILPACK_VERSION in cmd/deploy/Dockerfile.
 const railpackFrontendImage = "ghcr.io/railwayapp/railpack-frontend:v0.40.1@sha256:f1973377693af30c9b37a92c97c661c07b277ccdc6be909213c74c771f8d2d6d"
 
-// minScrubbedSecretLen skips very short values (e.g. PORT=80, DEBUG=1) that
-// would otherwise mask unrelated log text.
 const minScrubbedSecretLen = 6
 
-// newSecretScrubber returns a function that masks env values in build output
-// before it reaches user-visible build logs or server logs.
-// Output is scrubbed line by line, so multi-line values (e.g. PEM keys) are
-// also matched per line, and longer values are matched before shorter ones
-// so a secret that contains another isn't only partially masked.
 func newSecretScrubber(env map[string][]byte) func(string) string {
 	type secret struct{ value, key string }
 	var secrets []secret
@@ -343,9 +322,6 @@ func newSecretScrubber(env map[string][]byte) func(string) string {
 	return strings.NewReplacer(pairs...).Replace
 }
 
-// reservedBuildEnvKeys are process variables of the backend container that a
-// tenant's service env must not override for the railpack/buildctl processes
-// (e.g. redirecting their traffic through a proxy or swapping binaries).
 var reservedBuildEnvKeys = map[string]bool{
 	"PATH": true, "HOME": true, "USER": true, "SHELL": true, "TMPDIR": true,
 	"LD_PRELOAD": true, "LD_LIBRARY_PATH": true,
@@ -690,10 +666,6 @@ func cloneRepoWithLogs(ctx context.Context, cloneURL, accessToken, branch string
 	return parent, nil
 }
 
-// gitAuthEnv returns the process env plus an http.extraheader that
-// authenticates git to github.com with the installation token. Passing it
-// through GIT_CONFIG_* (as actions/checkout does) keeps the token off argv
-// and out of .git/config, so it can't end up in the build context or image.
 func gitAuthEnv(accessToken string) []string {
 	env := os.Environ()
 	if accessToken == "" {
@@ -707,9 +679,6 @@ func gitAuthEnv(accessToken string) []string {
 	)
 }
 
-// stripGitDir removes the clone's .git directory once checkout is done.
-// Railpack copies the whole build context into the image, and repo history
-// and remote config have no business shipping with the app.
 func stripGitDir(cloneDir string) error {
 	return os.RemoveAll(filepath.Join(cloneDir, ".git"))
 }

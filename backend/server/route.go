@@ -13,10 +13,6 @@ func (s *Application) registerRoutes(
 	r *mux.Router,
 ) error {
 
-	// Per-user API budget and a tighter one for routes that start builds.
-	// The webhook is deliberately not rate limited: a shared bucket checked
-	// before signature verification would let unsigned junk starve real
-	// GitHub deliveries; webhook builds are bounded by the build semaphore.
 	apiLimit := newRateLimiter(rate.Limit(10), 40)
 	buildLimit := newRateLimiter(rate.Every(20*time.Second), 5)
 

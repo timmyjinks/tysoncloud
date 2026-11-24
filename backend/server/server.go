@@ -34,8 +34,6 @@ func (app *Application) Start(mux http.Handler) error {
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       90 * time.Second,
 		IdleTimeout:       90 * time.Second,
-		// No WriteTimeout: it would cut off long-lived log WebSockets, which
-		// set per-message write deadlines instead.
 	}
 
 	fmt.Printf("Server running on http://localhost%s\n", app.Config.Server.Addr)

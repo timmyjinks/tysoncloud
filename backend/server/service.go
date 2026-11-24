@@ -387,11 +387,6 @@ func (app *Application) DeleteService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The DB record is gone at this point regardless of what happens
-	// below — log infra cleanup failures for ops rather than blocking
-	// or confusing the user with a partial-failure response. (Previously
-	// this branch returned with NO response written at all on a k8s
-	// error, silently leaving the request hanging as an empty 200.)
 	if err := app.Deploy.DeleteService(r.Context(), deploy.Service{
 		Namespace: "proj-" + service.ProjectId,
 		Name:      "svc-" + serviceId,

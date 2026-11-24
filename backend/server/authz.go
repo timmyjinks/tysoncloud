@@ -7,10 +7,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// RequireProjectOwner rejects requests whose {project_id} route variable is
-// not a project owned by the authenticated user. Handlers behind it can use
-// the URL project_id to target Kubernetes namespaces. It must run after
-// Clerk's header-auth middleware so session claims are in the context.
 func (app *Application) RequireProjectOwner(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		projectId := mux.Vars(r)["project_id"]

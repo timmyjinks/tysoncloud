@@ -198,7 +198,6 @@ func (s *SupabaseStore) UpdateGithubServiceStatusById(id, status string) (Github
 	var pgErr PostgrestError
 	if err := json.Unmarshal([]byte(result), &pgErr); err == nil && pgErr.Message != "" {
 		if isMissingFunctionError(pgErr) {
-			// Fallback to direct table update when RPC is missing (schema cache).
 			return s.updateGithubServiceStatusDirect(id, status)
 		}
 		return GithubServicesTable{}, rpcError("update_github_service_status_by_id", pgErr)
@@ -231,8 +230,6 @@ func (s *SupabaseStore) updateGithubServiceStatusDirect(id, status string) (Gith
 	return single, nil
 }
 
-// RelinkGithubServices points the user's detached github_services (whose
-// connection was removed by an app uninstall) at connectionId.
 func (s *SupabaseStore) RelinkGithubServices(userId, connectionId string) error {
 	projects, err := s.GetProjects(userId)
 	if err != nil {
@@ -285,8 +282,6 @@ func (s *SupabaseStore) GetGithubServiceById(id string) (GithubServicesTable, er
 	return table, nil
 }
 
-// GetProductionGithubServices returns only prod rows, excluding preview copies
-// tracked in preview_environment_services.
 func (s *SupabaseStore) GetProductionGithubServices(projectId, userId string) ([]GithubServicesTable, error) {
 	services, err := s.GetGithubServices(projectId, userId)
 	if err != nil {

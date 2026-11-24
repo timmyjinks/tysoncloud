@@ -76,7 +76,6 @@ func PreviewNamespaceForRepo(repoID int64, prNumber int) string {
 	return ns
 }
 
-// Deprecated: use PreviewNamespaceForRepo.
 func PreviewNamespace(serviceID string, prNumber int) string {
 	base := fmt.Sprintf("prev-%s", ShortServiceID(serviceID))
 	suffix := fmt.Sprintf("-pr-%d", prNumber)

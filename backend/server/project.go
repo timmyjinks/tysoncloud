@@ -320,8 +320,6 @@ func ValidateToml(config Config) []Issue {
 
 var tomlLineRe = regexp.MustCompile(`line (\d+)`)
 
-// tomlParseIssue turns a BurntSushi/toml parse error into an Issue with the
-// offending line number where one can be parsed out.
 func tomlParseIssue(err error) Issue {
 	msg := err.Error()
 	msg = strings.TrimPrefix(msg, "toml: ")

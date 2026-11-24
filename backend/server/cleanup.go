@@ -34,11 +34,6 @@ func newConfigRollback(projectId, userId string) *configRollback {
 	}
 }
 
-// rollbackProjectConfig tears down every resource a failed config apply
-// created. It leaves the project itself untouched so that previously
-// configured services keep working and more services can be added later.
-// It is best-effort: each step is logged on failure and the rest of the
-// teardown continues.
 func (app *Application) rollbackProjectConfig(rb *configRollback) {
 	ctx := context.Background()
 	namespace := "proj-" + rb.projectId

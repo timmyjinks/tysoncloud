@@ -170,8 +170,6 @@ func (s *SupabaseStore) DeleteDatabase(id, userId string) error {
 	return nil
 }
 
-// GetProductionDatabases returns only prod rows, excluding preview copies
-// tracked in preview_environment_services.
 func (s *SupabaseStore) GetProductionDatabases(projectId, userId string) ([]DatabasesTable, error) {
 	databases, err := s.GetDatabases(projectId, userId)
 	if err != nil {

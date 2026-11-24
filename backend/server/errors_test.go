@@ -135,8 +135,6 @@ func TestDomainErrorClassifiers(t *testing.T) {
 		taken, duplicate, invalidDN bool
 	}{
 		{nil, false, false, false},
-		// Also matches the validation check ("violates" + "domain"), so handlers
-		// must test isDomainTakenError first to return 409 rather than 400.
 		{errors.New(`duplicate key value violates unique constraint "services_public_domain_key"`), true, true, true},
 		{errors.New(`duplicate key value violates unique constraint "services_name_key"`), false, true, false},
 		{errors.New(`new row violates check constraint "public_domain_format"`), false, false, true},

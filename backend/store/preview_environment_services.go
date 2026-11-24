@@ -231,8 +231,6 @@ func (s *SupabaseStore) EnsureServiceCopy(ownerId string, src ServicesTable, prN
 	if all, err := s.GetServicesByProjectId(src.ProjectId); err == nil {
 		for _, v := range all {
 			if v.Name == name {
-				// Keep the copy tracking prod's image (port stays
-				// preview-owned via the preview edit endpoint).
 				if v.Image != src.Image {
 					if updated, uerr := s.UpdateServiceImageById(v.Id, src.Image); uerr == nil {
 						return updated, nil
